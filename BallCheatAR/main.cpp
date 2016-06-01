@@ -1,12 +1,13 @@
 #include "stdafx.h"
 #include "setting.h"
+#include "button.h"
 #include <Windows.h>
 #include <iostream>
 #include <opencv2\imgproc.hpp>
 #include <opencv2\core\core.hpp>
 #include <opencv2\highgui\highgui.hpp>
 
-using namespace cv;
+using namespace cv; 
 using namespace std;
 
 
@@ -17,8 +18,7 @@ int poolSetNumber = 0;
 Point poolPos[2];
 
 //개체들
-Rect btnResetPoolPos;
-
+Button btnResetPoolPos;
 
 //메인 윈도우에 그려질 캔버스
 Mat3b canvas;
@@ -38,7 +38,7 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 	mY = y;
 
 	//당구대 리셋버튼
-	if (btnResetPoolPos.contains(Point(x, y)))
+	if (btnResetPoolPos.isInPos(x, y))
 	{
 		if (poolSet)	//당구대가 설정되어있는 경우에만 리셋버튼이 눌린다
 		{
@@ -52,18 +52,13 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 				for (int i = 0; i < 2; i++)
 					poolPos[i] = Point(-1, -1);
 				poolSet = false;
-				canvas(btnResetPoolPos) = Vec3b(200, 200, 200);
-				putText(canvas(btnResetPoolPos), "Pool Position Resetting(LT)",
-					Point(btnResetPoolPos.width*0.02, btnResetPoolPos.height*0.7),
-					FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
+				btnResetPoolPos.setText("Pool Position Resetting(LT)");
 			}
 		}
+		return;
 	}
 	
-	else
-	{
-		
-	}
+	
 
 	//당구대 위치 설정
 	if (!poolSet)
@@ -76,23 +71,31 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 				poolPos[poolSetNumber].x = x;
 				poolPos[poolSetNumber].y = y;
 				poolSetNumber += 1;
-				canvas(btnResetPoolPos) = Vec3b(200, 200, 200);
-				putText(canvas(btnResetPoolPos), "Pool Position Resetting(RD)",
-					Point(btnResetPoolPos.width*0.02, btnResetPoolPos.height*0.7),
-					FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
+				btnResetPoolPos.setText("Pool Position Resetting(RD)");
 				if (poolSetNumber == 2)
 				{
 					poolSetNumber = 0;
 					poolSet = true;
-					canvas(btnResetPoolPos) = Vec3b(200, 200, 200);
-					putText(canvas(btnResetPoolPos), format("Reset Pool Pos", poolSetNumber + 1),
-						Point(btnResetPoolPos.width*0.1, btnResetPoolPos.height*0.7),
-						FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
+					btnResetPoolPos.setText("Reset Pool Pos");
 				}
 			}
 		}
 	}
 
+}
+
+
+bool isIntersection(Point2f o1, Point2f p1, Point2f o2, Point2f p2)
+{
+	Point2f x = o2 - o1;
+	Point2f d1 = p1 - o1;
+	Point2f d2 = p2 - o2;
+
+	float cross = d1.x*d2.y - d1.y*d2.x;
+	if (abs(cross) < /*EPS*/1e-8)
+		return false;
+	else
+		return true;
 }
 
 int main()
@@ -111,6 +114,7 @@ int main()
 
 	//윈도우 생성
 	namedWindow("Main");
+	namedWindow("Canny");
 	namedWindow("Display", CV_WINDOW_FULLSCREEN);
 
 	resizeWindow("Main", IMG_W, IMG_H + PANEL_H);
@@ -124,11 +128,7 @@ int main()
 		canvas = Mat3b(IMG_H+PANEL_H, IMG_W, Vec3b(0, 0, 0));
 
 		//버튼
-		btnResetPoolPos = Rect(0, IMG_H, 230, PANEL_H);
-		canvas(btnResetPoolPos) = Vec3b(200, 200, 200);
-		putText(canvas(btnResetPoolPos), "Pool Position Resetting(1)",
-			Point(btnResetPoolPos.width*0.02, btnResetPoolPos.height*0.7),
-			FONT_HERSHEY_PLAIN, 1, Scalar(0, 0, 0));
+		btnResetPoolPos = Button(canvas, 0, IMG_H, 230, PANEL_H, "Pool Position Resetting(LT)", Scalar(200, 200, 200));
 
 	}
 	catch (Exception e)
@@ -160,13 +160,19 @@ int main()
 				cvtColor(srcImg, procImg, COLOR_BGR2GRAY, 0);
 
 				//이미지 가우시안블러 적용
-				//GaussianBlur(procImg, procImg, Size(3, 3), 0);
+				GaussianBlur(procImg, procImg, Size(3, 3), 0);
 
-				//원 배열
-				vector<Vec3f> circles;
+				//원(당구공) 검출 (circles에 담는다)
+				vector<Vec3f> circles;				
+				HoughCircles(procImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, 80, 10, MAX_BALL_SIZE, MIN_BALL_SIZE);
 
-				//원 검출 (circles에 담는다)
-				HoughCircles(procImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, 60, 10, MAX_BALL_SIZE, MIN_BALL_SIZE);
+				//캐니 변환
+				Canny(procImg, procImg, 80, 10);
+				imshow("Canny", procImg);
+
+				//라인(큐대) 검출(lines에 담는다)
+				vector<Vec2f> lines;
+				HoughLines(procImg, lines, 1, CV_PI / 180, 220);
 
 				//검출된 원 중 가장자리에 붙어있거나 가장자리 넘어간 원들을 다 지운다
 				//그리고 지워지지 않는 원을 
@@ -201,15 +207,47 @@ int main()
 					++itc;
 				}
 
+				//당구대 바깥을 겨냥한 선들은 다 지운다
+				vector<Vec2f>::const_iterator itc2 = lines.begin();
+				while (itc2 != lines.end())
+				{
+
+					double a = cos((*itc2)[1]), b = sin((*itc2)[1]);
+					double x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
+					Point pt1, pt2;
+					pt1.x = round(x0 + IMG_W * (-b));
+					pt1.y = round(y0 + IMG_W * (a));
+					pt2.x = round(x0 - IMG_W * (-b));
+					pt2.y = round(y0 - IMG_W * (a));
+
+
+					//사각형의 각 변과의 교점을 찾는다. 교점이 하나도 없으면 당구대 밖이므로 지운다.
+					if (!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[1].x, poolPos[0].y)) &&
+						!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[0].x, poolPos[1].y)) &&
+						!isIntersection(pt1, pt2,Point(poolPos[0].x, poolPos[1].y), poolPos[1]) &&
+						!isIntersection(pt1, pt2,Point(poolPos[1].x, poolPos[0].y), poolPos[1]))
+					{
+						lines.erase(itc2);
+						itc2 = lines.begin();
+						continue;
+					}
+
+					////살아남은 라인을 그린다. 
+					/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
+					Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
+
+					line(outImg, pt1, pt2, Scalar(255, 255, 255));
+					line(srcImg, pt1, pt2, Scalar(0, 0, 255));
+
+					++itc2;
+
+				}
+
 				//당구대 가장자리 선을 그린다
 				rectangle(srcImg, Rect(poolPos[0], poolPos[1]), Scalar(255, 255, 255), 2);
 				rectangle(srcImg, Rect(pntGuideline1, pntGuideline2), Scalar(0, 255, 255), 2);
 				rectangle(outImg, Rect(poolPos[0], poolPos[1]), Scalar(255, 255, 255), 2);
-				/*for (int i = 0; i < 4; i++)
-				{
-					line(srcImg, poolPos[i], poolPos[i + 1 >= 4 ? 0 : i + 1], Scalar(0, 255, 0), 2);
-					line(outImg, poolPos[i], poolPos[i + 1 >= 4 ? 0 : i + 1], Scalar(255,255,255), 2);
-				}*/
+			
 			}
 			//현재 당구대 위치 설정중이면
 			else
@@ -231,6 +269,7 @@ int main()
 			srcImg.copyTo(canvas(Rect(0, 0, srcImg.cols, srcImg.rows)));
 
 			//출력
+
 			imshow("Main", canvas);
 			imshow("Display", outImg);
 		}
@@ -250,4 +289,3 @@ int main()
 	
 	return 0;
 }
-
