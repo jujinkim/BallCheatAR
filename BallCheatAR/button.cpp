@@ -26,7 +26,7 @@ void Button::updateObject()
 	cv::Rect r(this->x, this->y, this->width, this->height);
 	this->canvas(r) = this->Color;
 	cv::putText(this->canvas(r), this->Text,
-		cv::Point(this->width*0.5 - (this->Text.length()*4), this->height*0.7),
+		cv::Point(this->width*0.5 - (this->Text.length()*4.5), this->height*0.7),
 		cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 0, 0));
 }
 
