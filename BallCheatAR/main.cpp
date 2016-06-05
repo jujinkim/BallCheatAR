@@ -40,9 +40,15 @@ Mat outImg;
 //화면 위 마우스 위치
 int mX, mY;
 
+//선을 그릴까?
 bool drawLine = false;
+
+//매개변수들
 double cParam1 = 80, cParam2 = 10;
 double cTh1 = 80, cTh2 = 10;
+
+//반지름
+double radiusMultiply = 2;
 
 //화면에 마우스 조작을 했을 경우
 void callBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -328,7 +334,7 @@ int main()
 					}
 
 					//살아남은 공은 그린다
-					circle(outImg, Point((*itc)[0], (*itc)[1]), (*itc)[2] * 2, Scalar(255,255,255), 2);
+					circle(outImg, Point((*itc)[0], (*itc)[1]), (*itc)[2] * radiusMultiply, Scalar(255,255,255), 2);
 					circle(srcImg, Point((*itc)[0], (*itc)[1]), (*itc)[2], Scalar(255,0,0), 2);
 
 					++itc;
@@ -367,11 +373,35 @@ int main()
 						////살아남은 라인을 그린다. 
 						/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
 						Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
-
-						line(outImg, pt1, pt2, Scalar(255, 255, 255));
-						line(srcImg, pt1, pt2, Scalar(0, 0, 255));
+						/*line(outImg, pt1, pt2, Scalar(255, 255, 255));
+						line(srcImg, pt1, pt2, Scalar(0, 0, 255));*/
 
 						++itc2;
+					}
+
+					if (lines.size() > 1)
+					{
+						itc2 = lines.begin();
+						double a = cos((*itc2)[1]), b = sin((*itc2)[1]);
+						double x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
+						Point pt1, pt2, pt3, pt4, ptS, ptE;
+						pt1.x = round(x0 + IMG_W * (-b));
+						pt1.y = round(y0 + IMG_W * (a));
+						pt2.x = round(x0 - IMG_W * (-b));
+						pt2.y = round(y0 - IMG_W * (a));
+						line(srcImg, pt1, pt2, Scalar(0, 0, 255));
+						itc2 = lines.end() - 1;
+						a = cos((*itc2)[1]), b = sin((*itc2)[1]);
+						x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
+						pt3.x = round(x0 + IMG_W * (-b));
+						pt3.y = round(y0 + IMG_W * (a));
+						pt4.x = round(x0 - IMG_W * (-b));
+						pt4.y = round(y0 - IMG_W * (a));
+						line(srcImg, pt3, pt4, Scalar(0, 0, 255));
+						ptS = (pt1 + pt3) / 2; ptE = (pt2 + pt4) / 2;
+						line(outImg, ptS, ptE, Scalar(255, 255, 255));
+						line(srcImg, ptS, ptE, Scalar(0, 0, 255));
+
 					}
 				}
 
