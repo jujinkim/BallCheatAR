@@ -45,7 +45,7 @@ bool drawLine = false;
 
 //매개변수들
 double cParam1 = 80, cParam2 = 10;
-double cTh1 = 80, cTh2 = 10;
+double cTh1 = 80, cTh2 = 20;
 
 //반지름
 double radiusMultiply = 2;
@@ -305,7 +305,7 @@ int main()
 
 				//라인(큐대) 검출(lines에 담는다)
 				vector<Vec2f> lines;
-				if(drawLine) HoughLines(procImg, lines, 1, CV_PI / 180, 220);
+				if(drawLine) HoughLines(procImg, lines, 1, CV_PI / 180, 150);
 
 				//검출된 원 중 가장자리에 붙어있거나 가장자리 넘어간 원들을 다 지운다
 				////////////////////원 그리기///////////////////////
@@ -389,7 +389,7 @@ int main()
 						pt1.y = round(y0 + IMG_W * (a));
 						pt2.x = round(x0 - IMG_W * (-b));
 						pt2.y = round(y0 - IMG_W * (a));
-						line(srcImg, pt1, pt2, Scalar(0, 0, 255));
+						line(srcImg, pt1, pt2, Scalar(255, 255, 255));
 						itc2 = lines.end() - 1;
 						a = cos((*itc2)[1]), b = sin((*itc2)[1]);
 						x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
@@ -397,9 +397,9 @@ int main()
 						pt3.y = round(y0 + IMG_W * (a));
 						pt4.x = round(x0 - IMG_W * (-b));
 						pt4.y = round(y0 - IMG_W * (a));
-						line(srcImg, pt3, pt4, Scalar(0, 0, 255));
+						line(srcImg, pt3, pt4, Scalar(255, 255, 255));
 						ptS = (pt1 + pt3) / 2; ptE = (pt2 + pt4) / 2;
-						line(outImg, ptS, ptE, Scalar(255, 255, 255));
+						line(outImg, ptS, ptE, Scalar(255, 255, 255), 3);
 						line(srcImg, ptS, ptE, Scalar(0, 0, 255));
 
 					}
