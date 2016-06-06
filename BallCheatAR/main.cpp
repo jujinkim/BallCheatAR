@@ -18,14 +18,6 @@ Point poolPos[2];
 
 //개체들
 Button btnResetPoolPos;
-Button btnCParam1Add, btnCParam1Sub;
-Button btnCParam2Add, btnCParam2Sub;
-Button btnCTh1Add, btnCTh1Sub;
-Button btnCTh2Add, btnCTh2Sub;
-
-Button lblCparam1, lblCparam2, lblCTh1, lblCTh2;
-Button lblCparam1lbl, lblCparam2lbl, lblCTh1lbl, lblCTh2lbl;
-
 Button chkLine;
 
 //메인 윈도우에 그려질 캔버스
@@ -34,6 +26,7 @@ Mat3b canvas;
 //카메라 프레임을 저장할 변수
 Mat srcImg;
 Mat procImg;
+Mat thdImg;
 Mat outImg;
 
 //화면 위 마우스 위치
@@ -43,8 +36,11 @@ int mX, mY;
 bool drawLine = false;
 
 //매개변수들
-double cParam1 = 80, cParam2 = 10;
-double cTh1 = 80, cTh2 = 20;
+int cParam1 = 80, cParam2 = 10;
+int cTh1 = 80, cTh2 = 20;
+
+int poolRGB_R_Min = 20, poolRGB_G_Min = 70, poolRGB_B_Min = 60;
+int poolRGB_R_Max = 120, poolRGB_G_Max = 180, poolRGB_B_Max = 180;
 
 //반지름
 double radiusMultiply = 2;
@@ -81,81 +77,6 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 			chkLine.setText(drawLine?"Line O":"Line X");
 		}
 	}
-	
-#pragma region 매개변수 설정 버튼 함수
-	//cParam1
-	if (btnCParam1Add.isInPos(x, y)) 
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cParam1 += 5;
-			lblCparam1.setText(format("%d", (int)cParam1));
-		}
-	}
-	if (btnCParam1Sub.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cParam1 -= cParam1>5?5:0;
-			lblCparam1.setText(format("%d", (int)cParam1));
-		}
-	}
-
-	//cParam2
-	if (btnCParam2Add.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cParam2 += 5;
-			lblCparam2.setText(format("%d", (int)cParam2));
-		}
-	}
-	if (btnCParam2Sub.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cParam2 -= cParam2>5?5:0;
-			lblCparam2.setText(format("%d", (int)cParam2));
-		}
-	}
-
-	//cTh1
-	if (btnCTh1Add.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cTh1 += 5;
-			lblCTh1.setText(format("%d", (int)cTh1));
-		}
-	}
-	if (btnCTh1Sub.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cTh1 -= cTh1>5 ? 5 : 0;
-			lblCTh1.setText(format("%d", (int)cTh1));
-		}
-	}
-
-	//cTh2
-	if (btnCTh2Add.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cTh2 += 5;
-			lblCTh2.setText(format("%d", (int)cTh2));
-		}
-	}
-	if (btnCTh2Sub.isInPos(x, y))
-	{
-		if (event == EVENT_LBUTTONUP)
-		{
-			cTh2 -= cTh2>5 ? 5 : 1;
-			lblCTh2.setText(format("%d", (int)cTh2));
-		}
-	}
-	
-#pragma endregion
 
 	//당구대 위치 설정
 	if (!poolSet)
@@ -181,6 +102,7 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 
 }
 
+//교차점 구하는거
 Point* isIntersection(Point p1, Point p2, Point p3, Point p4) {
 	// Store the values for fast access and easy
 	// equations-to-code conversion
@@ -209,9 +131,25 @@ Point* isIntersection(Point p1, Point p2, Point p3, Point p4) {
 	return ret;
 }
 
+//모프? 좀 더 뭉뚱그리는거같음
+void morphOps(Mat &thresh) {
+
+	//create structuring element that will be used to "dilate" and "erode" image.
+	//the element chosen here is a 3px by 3px rectangle
+	Mat erodeElement = getStructuringElement(MORPH_RECT, Size(2, 2));
+	//dilate with larger element so make sure object is nicely visible
+	Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2, 2));
+
+	erode(thresh, thresh, erodeElement);
+	erode(thresh, thresh, erodeElement);
+
+	dilate(thresh, thresh, dilateElement);
+	dilate(thresh, thresh, dilateElement);
+}
+
 int main()
 {
-	cerr << cv::getBuildInformation();
+	//cerr << cv::getBuildInformation();
 
 	//당구대 꼭지점 초기화
 	for each (Point p in poolPos)
@@ -226,9 +164,25 @@ int main()
 	//윈도우 생성
 	namedWindow("Main");
 	namedWindow("Canny");
+	namedWindow("Threshold");
+	namedWindow("Setting");
 	namedWindow("Display", CV_WINDOW_FULLSCREEN);
 
-	resizeWindow("Main", IMG_W, IMG_H + PANEL_H*3+30);
+	resizeWindow("Main", IMG_W, IMG_H + PANEL_H);
+	resizeWindow("Setting", 400, 600);
+
+	//트랙바 생성
+	createTrackbar("cParam1", "Setting", &cParam1, 255);
+	createTrackbar("cParam2", "Setting", &cParam2, 255);
+	createTrackbar("cCanny1", "Setting", &cTh1, 255);
+	createTrackbar("cCanny2", "Setting", &cTh2, 255);
+
+	createTrackbar("poolR_m", "Setting", &poolRGB_R_Min, 255);
+	createTrackbar("poolG_m", "Setting", &poolRGB_G_Min, 255);
+	createTrackbar("poolB_m", "Setting", &poolRGB_B_Min, 255);
+	createTrackbar("poolR_M", "Setting", &poolRGB_R_Max, 255);
+	createTrackbar("poolG_M", "Setting", &poolRGB_G_Max, 255);
+	createTrackbar("poolB_M", "Setting", &poolRGB_B_Max, 255);
 
 	//마우스 콜백함수 연결
 	setMouseCallback("Main", callBackFunc);
@@ -236,31 +190,10 @@ int main()
 	//개체들 생성
 	try
 	{
-		canvas = Mat3b(IMG_H+PANEL_H*3+30, IMG_W, Vec3b(0, 0, 0));
+		canvas = Mat3b(IMG_H+PANEL_H, IMG_W, Vec3b(0, 0, 0));
 
 		//버튼
 		btnResetPoolPos = Button(canvas, 0, IMG_H, 260, PANEL_H, "Pool Position Resetting(LT)", Scalar(200, 200, 200));
-
-		btnCParam1Add = Button(canvas, 80, IMG_H+PANEL_H+10, 20, PANEL_H, "+", Scalar(230, 230, 230));
-		btnCParam1Sub = Button(canvas, 60+80, IMG_H+PANEL_H+10, 20, PANEL_H, "-", Scalar(230, 230, 230));
-		btnCTh1Add = Button(canvas, 100+160, IMG_H+PANEL_H+10, 20, PANEL_H, "+", Scalar(230, 230, 230));
-		btnCTh1Sub = Button(canvas, 160+160, IMG_H+PANEL_H+10, 20, PANEL_H, "-", Scalar(230, 230, 230));
-		btnCParam2Add = Button(canvas, 80, IMG_H + PANEL_H * 2 + 20, 20, PANEL_H, "+", Scalar(230, 230, 230));
-		btnCParam2Sub = Button(canvas, 60+80, IMG_H+PANEL_H*2+20, 20, PANEL_H, "-", Scalar(230, 230, 230));
-		btnCTh2Add = Button(canvas, 100+160, IMG_H+PANEL_H*2+20, 20, PANEL_H, "+", Scalar(230, 230, 230));
-		btnCTh2Sub = Button(canvas, 160+160, IMG_H+PANEL_H*2+20, 20, PANEL_H, "-", Scalar(230, 230, 230));
-
-		//레이블
-		lblCparam1 = Button(canvas, 20+80, IMG_H+PANEL_H+10, 40, PANEL_H, format("%d", (int)cParam1), Scalar(255, 255, 255));
-		lblCTh1 = Button(canvas, 200+80, IMG_H+PANEL_H+10, 40, PANEL_H, format("%d", (int)cTh1), Scalar(255, 255, 255));
-		lblCparam2 = Button(canvas, 20+80, IMG_H+PANEL_H*2+20, 40, PANEL_H, format("%d", (int)cParam2), Scalar(255, 255, 255));
-		lblCTh2 = Button(canvas, 200+80, IMG_H + PANEL_H*2+20, 40, PANEL_H, format("%d", (int)cTh2), Scalar(255, 255, 255));
-		lblCparam1lbl = Button(canvas, 0, IMG_H + PANEL_H+10, 80, PANEL_H, "cParam1", Scalar(255, 255, 255));
-		lblCTh1lbl = Button(canvas, 180, IMG_H + PANEL_H+10, 80, PANEL_H, "cTh1", Scalar(255, 255, 255));
-		lblCparam2lbl = Button(canvas, 0, IMG_H + PANEL_H * 2+20, 80, PANEL_H, "cParam2", Scalar(255, 255, 255));
-		lblCTh2lbl = Button(canvas, 180, IMG_H + PANEL_H * 2+20, 80, PANEL_H, "cTh2", Scalar(255, 255, 255));
-
-		//체크박스
 		chkLine = Button(canvas, IMG_W - 80, IMG_H, 80, PANEL_H, "Line X", Scalar(230, 230, 230));
 	}
 	catch (Exception e)
@@ -290,16 +223,20 @@ int main()
 														0, -1, 0);
 				filter2D(srcImg, srcImg, srcImg.depth(), sharpen_kernel);*/
 
+				inRange(srcImg, Scalar(poolRGB_B_Min, poolRGB_G_Min, poolRGB_R_Min), Scalar(poolRGB_B_Max, poolRGB_G_Max, poolRGB_R_Max), thdImg);
+				imshow("Threshold", thdImg);
+
 				//이미지 그레이스케일 변환
-				cvtColor(srcImg, procImg, COLOR_BGR2GRAY, 0);
+				//cvtColor(thdImg, procImg, COLOR_BGR2GRAY, 0);
 
 				//이미지 가우시안블러 적용
-				GaussianBlur(procImg, procImg, Size(3, 3), 0);
+				GaussianBlur(thdImg, procImg, Size(3, 3), 0);
 
 				//원(당구공) 검출 (circles에 담는다)
 				vector<Vec3f> circles;				
 				HoughCircles(procImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2, MAX_BALL_SIZE, MIN_BALL_SIZE);
 
+				morphOps(procImg);
 				//캐니 변환
 				Canny(procImg, procImg, cTh1, cTh2);
 				imshow("Canny", procImg);
@@ -376,52 +313,81 @@ int main()
 					////살아남은 라인을 그린다. 
 					/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
 					Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
-					/*line(outImg, pt1, pt2, Scalar(255, 255, 255));
-					line(srcImg, pt1, pt2, Scalar(0, 0, 255));*/
 					if (lines.size() > 1)
 					{
 						itc2 = lines.begin();
-						double a = cos((*itc2)[1]), b = sin((*itc2)[1]);
-						double x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
+						double t1 = (*itc2)[1];
+						double a1 = cos(t1), b1 = sin(t1);
+						double x01 = a1*((*itc2)[0]), y01 = b1*((*itc2)[0]);
 						Point pt1, pt2, pt3, pt4, ptS, ptE, *ptTS = NULL, *ptTE = NULL;
-						pt1.x = round(x0 + IMG_W * (-b));
-						pt1.y = round(y0 + IMG_W * (a));
-						pt2.x = round(x0 - IMG_W * (-b));
-						pt2.y = round(y0 - IMG_W * (a));
+						pt1.x = round(x01 + IMG_W * (-b1));
+						pt1.y = round(y01 + IMG_W * (a1));
+						pt2.x = round(x01 - IMG_W * (-b1));
+						pt2.y = round(y01 - IMG_W * (a1));
 						line(srcImg, pt1, pt2, Scalar(255, 255, 255));
 						itc2 = lines.end() - 1;
-						a = cos((*itc2)[1]), b = sin((*itc2)[1]);
-						x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
-						pt3.x = round(x0 + IMG_W * (-b));
-						pt3.y = round(y0 + IMG_W * (a));
-						pt4.x = round(x0 - IMG_W * (-b));
-						pt4.y = round(y0 - IMG_W * (a));
+						double t2 = (*itc2)[1];
+						double a2 = cos(t2), b2 = sin(t2);
+						double x02 = a2*((*itc2)[0]), y02 = b2*((*itc2)[0]);
+						pt3.x = round(x02 + IMG_W * (-b2));
+						pt3.y = round(y02 + IMG_W * (a2));
+						pt4.x = round(x02 - IMG_W * (-b2));
+						pt4.y = round(y02 - IMG_W * (a2));
 						line(srcImg, pt3, pt4, Scalar(255, 255, 255));
-						ptS = (pt1 + pt3) / 2; ptE = (pt2 + pt4) / 2;
+
+						//최종 선분의 각도(t3)와 좌표(x03, y03)
+						double t3 = (t1 + t2) / 2;
+						double a3 = cos(t3), b3 = sin(t3);
+						double x03 = (x01 + x02) / 2, y03 = (y01 + y02) / 2;
+						ptS.x = round(x03 + IMG_W * (-b3));
+						ptS.y = round(y03 + IMG_W * (a3));
+						ptE.x = round(x03 - IMG_W * (-b3));
+						ptE.y = round(y03 - IMG_W * (a3));
+
+						cout << t3 << endl;;
 
 						//당구대 안에만
-						ptTS =				 isIntersection(ptS, ptE, poolPos[0], Point(poolPos[1].x, poolPos[0].y));
-						ptTS ? ptTE : ptTS = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[0].x, poolPos[1].y));
-						ptTS ? ptTE : ptTS = isIntersection(ptS, ptE, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);
-						ptTS ? ptTE : ptTS = isIntersection(ptS, ptE, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);
+						ptTS			    = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[1].x, poolPos[0].y));
 
-						line(outImg, *ptTS, *ptTE, Scalar(255, 255, 255), 3);
-						line(srcImg, *ptTS, *ptTE, Scalar(0, 0, 255));
+						if (!ptTS)	   ptTS = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[0].x, poolPos[1].y));
+						else if(!ptTE) ptTE = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[0].x, poolPos[1].y));
 
+						if (!ptTS)		ptTS = isIntersection(ptS, ptE, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);
+						else if (!ptTE) ptTE = isIntersection(ptS, ptE, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);
+
+						if (!ptTS)		ptTS = isIntersection(ptS, ptE, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);
+						else if (!ptTE) ptTE = isIntersection(ptS, ptE, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);
+
+						if (ptTS && ptTE) {
+							line(outImg, *ptTS, *ptTE, Scalar(255, 255, 255), 3);
+							line(srcImg, *ptTS, *ptTE, Scalar(0, 0, 255));
+
+							//벽에 튕긴 후 예상경로
+							Point ptNE;
+							Point ptNS;
+							double t4 = -t3;
+							double a4 = cos(t4), b4 = sin(t4);
+
+							if (abs(norm(pt1 - pt3)) < abs(norm(pt2 - pt4)))
+							{
+								ptNS = *ptTS;
+								ptNE.x = round(ptTE->x - IMG_W * (-b4));
+								ptNE.y = round(ptTE->y - IMG_W * (a3));
+							}
+							else
+							{
+								ptNS = *ptTE;
+								ptNE.x = round(ptTS->x - IMG_W * (-b4));
+								ptNE.y = round(ptTS->y - IMG_W * (a3));
+							}
+
+							
+
+							line(outImg, ptNS, ptNE, Scalar(255, 255, 255), 3);
+							line(srcImg, ptNS, ptNE, Scalar(0, 0, 255));
+						}
 					}
 				}
-				/*vector<Vec4f> liness;
-				Ptr<LineSegmentDetector> LSDetector = createLineSegmentDetector();
-				LSDetector->detect(procImg, liness);
-				vector<Vec4f>::const_iterator itc3 = liness.begin();
-				while (itc3 != liness.end())
-				{
-					Point pt1 = Point((*itc3)[0], (*itc3)[1]);
-					Point pt2 = Point((*itc3)[2], (*itc3)[3]);
-					line(outImg, pt1, pt2, Scalar(255, 255, 255));
-					line(srcImg, pt1, pt2, Scalar(0, 0, 255));
-					++itc3;
-				}*/
 
 				//당구대 가장자리 선을 그린다
 				rectangle(srcImg, Rect(poolPos[0], poolPos[1]), Scalar(255, 255, 255), 2);
@@ -464,6 +430,7 @@ int main()
 	srcImg.release();
 	outImg.release();
 	procImg.release();
+	thdImg.release();
 	capture.release();
 	cvDestroyAllWindows();
 	
