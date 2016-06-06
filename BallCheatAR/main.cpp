@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "setting.h"
 #include "button.h"
 #include <Windows.h>
@@ -272,11 +271,13 @@ int main()
 	//FPS표시 문자열 초기화
 	char strBuf[STRBUFFER] = { 0, };
 
+
 	//캡쳐 루프(프레임 가져와서 srcImg에 담는다)
 	while (capture.read(srcImg))
 	{
 		try
 		{
+			resize(srcImg, srcImg, Size(IMG_W, IMG_H));
 			//결과만 그릴 이미지
 			outImg = Mat(Size(srcImg.cols, srcImg.rows), srcImg.type(), Scalar(0, 0, 0));
 
@@ -354,9 +355,8 @@ int main()
 						pt2.x = round(x0 - IMG_W * (-b));
 						pt2.y = round(y0 - IMG_W * (a));
 
-
 						//사각형의 각 변과의 교점을 찾는다. 교점이 하나도 없으면 당구대 밖이므로 지운다.
-						/*if (!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[1].x, poolPos[0].y)) &&
+					   /*if(!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[1].x, poolPos[0].y)) &&
 							!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[0].x, poolPos[1].y)) &&
 							!isIntersection(pt1, pt2, Point(poolPos[0].x, poolPos[1].y), poolPos[1]) &&
 							!isIntersection(pt1, pt2, Point(poolPos[1].x, poolPos[0].y), poolPos[1]))*/
@@ -370,21 +370,20 @@ int main()
 							continue;
 						}
 
-						////살아남은 라인을 그린다. 
-						/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
-						Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
-						/*line(outImg, pt1, pt2, Scalar(255, 255, 255));
-						line(srcImg, pt1, pt2, Scalar(0, 0, 255));*/
-
 						++itc2;
 					}
 
+					////살아남은 라인을 그린다. 
+					/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
+					Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
+					/*line(outImg, pt1, pt2, Scalar(255, 255, 255));
+					line(srcImg, pt1, pt2, Scalar(0, 0, 255));*/
 					if (lines.size() > 1)
 					{
 						itc2 = lines.begin();
 						double a = cos((*itc2)[1]), b = sin((*itc2)[1]);
 						double x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
-						Point pt1, pt2, pt3, pt4, ptS, ptE;
+						Point pt1, pt2, pt3, pt4, ptS, ptE, *ptTS = NULL, *ptTE = NULL;
 						pt1.x = round(x0 + IMG_W * (-b));
 						pt1.y = round(y0 + IMG_W * (a));
 						pt2.x = round(x0 - IMG_W * (-b));
@@ -399,11 +398,30 @@ int main()
 						pt4.y = round(y0 - IMG_W * (a));
 						line(srcImg, pt3, pt4, Scalar(255, 255, 255));
 						ptS = (pt1 + pt3) / 2; ptE = (pt2 + pt4) / 2;
-						line(outImg, ptS, ptE, Scalar(255, 255, 255), 3);
-						line(srcImg, ptS, ptE, Scalar(0, 0, 255));
+
+						//당구대 안에만
+						ptTS =				 isIntersection(ptS, ptE, poolPos[0], Point(poolPos[1].x, poolPos[0].y));
+						ptTS ? ptTE : ptTS = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[0].x, poolPos[1].y));
+						ptTS ? ptTE : ptTS = isIntersection(ptS, ptE, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);
+						ptTS ? ptTE : ptTS = isIntersection(ptS, ptE, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);
+
+						line(outImg, *ptTS, *ptTE, Scalar(255, 255, 255), 3);
+						line(srcImg, *ptTS, *ptTE, Scalar(0, 0, 255));
 
 					}
 				}
+				/*vector<Vec4f> liness;
+				Ptr<LineSegmentDetector> LSDetector = createLineSegmentDetector();
+				LSDetector->detect(procImg, liness);
+				vector<Vec4f>::const_iterator itc3 = liness.begin();
+				while (itc3 != liness.end())
+				{
+					Point pt1 = Point((*itc3)[0], (*itc3)[1]);
+					Point pt2 = Point((*itc3)[2], (*itc3)[3]);
+					line(outImg, pt1, pt2, Scalar(255, 255, 255));
+					line(srcImg, pt1, pt2, Scalar(0, 0, 255));
+					++itc3;
+				}*/
 
 				//당구대 가장자리 선을 그린다
 				rectangle(srcImg, Rect(poolPos[0], poolPos[1]), Scalar(255, 255, 255), 2);
