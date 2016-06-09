@@ -19,6 +19,7 @@ Point poolPos[2];
 //개체들
 Button btnResetPoolPos;
 Button chkLine;
+Button btnPoolColor;
 
 //메인 윈도우에 그려질 캔버스
 Mat3b canvas;
@@ -26,8 +27,11 @@ Mat3b canvas;
 //카메라 프레임을 저장할 변수
 Mat srcImg;
 Mat procImg;
+Mat gryImg;
 Mat thdImg;
 Mat outImg;
+
+Mat img_lbl, stats, centroids;
 
 //화면 위 마우스 위치
 int mX, mY;
@@ -44,6 +48,11 @@ int poolRGB_R_Max = 120, poolRGB_G_Max = 180, poolRGB_B_Max = 180;
 
 //반지름
 double radiusMultiply = 2;
+
+//당구대 색상
+Scalar poolColor;
+int poolRange;
+bool poolColorSet = false;
 
 //화면에 마우스 조작을 했을 경우
 void callBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -81,6 +90,7 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 	//당구대 위치 설정
 	if (!poolSet)
 	{
+		btnPoolColor.setColor(srcImg.at<Scalar>(y, x));
 		//클릭하면 그 점을 당구대 꼭지점으로 설정한다.
 		if (event == EVENT_LBUTTONDOWN)
 		{
@@ -97,6 +107,26 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 					btnResetPoolPos.setText("Reset Pool Pos");
 				}
 			}
+		}
+	}
+
+	//당구대 색상 설정시작버튼
+	if (btnPoolColor.isInPos(x, y))
+	{
+		if (event == EVENT_LBUTTONUP)
+		{
+			poolColorSet = !poolColorSet;
+			btnPoolColor.setText(poolColorSet ? "Set Pool Color" : "Setting..");
+		}
+	}
+
+	//당구대 색상 설정
+	if (!poolColorSet)
+	{
+		//클릭하면 그 점을 당구대 색상으로 설정
+		if (event == EVENT_LBUTTONDOWN)
+		{
+
 		}
 	}
 
@@ -177,12 +207,15 @@ int main()
 	createTrackbar("cCanny1", "Setting", &cTh1, 255);
 	createTrackbar("cCanny2", "Setting", &cTh2, 255);
 
+	createTrackbar("pool_range", "Setting", &poolRange, 50);
+	/*
 	createTrackbar("poolR_m", "Setting", &poolRGB_R_Min, 255);
 	createTrackbar("poolG_m", "Setting", &poolRGB_G_Min, 255);
 	createTrackbar("poolB_m", "Setting", &poolRGB_B_Min, 255);
 	createTrackbar("poolR_M", "Setting", &poolRGB_R_Max, 255);
 	createTrackbar("poolG_M", "Setting", &poolRGB_G_Max, 255);
 	createTrackbar("poolB_M", "Setting", &poolRGB_B_Max, 255);
+	*/
 
 	//마우스 콜백함수 연결
 	setMouseCallback("Main", callBackFunc);
@@ -195,6 +228,7 @@ int main()
 		//버튼
 		btnResetPoolPos = Button(canvas, 0, IMG_H, 260, PANEL_H, "Pool Position Resetting(LT)", Scalar(200, 200, 200));
 		chkLine = Button(canvas, IMG_W - 80, IMG_H, 80, PANEL_H, "Line X", Scalar(230, 230, 230));
+		btnPoolColor = Button(canvas, 280, IMG_H, 150, PANEL_H, "Reset pool color", poolColor);
 	}
 	catch (Exception e)
 	{
@@ -214,8 +248,8 @@ int main()
 			//결과만 그릴 이미지
 			outImg = Mat(Size(srcImg.cols, srcImg.rows), srcImg.type(), Scalar(0, 0, 0));
 
-			//당구대 위치가 설정 된 상태이면
-			if (poolSet)
+			//당구대 위치와 색깔이 설정 된 상태이면
+			if (poolSet && poolColorSet)
 			{
 				//선명하게
 				/*Mat sharpen_kernel = (Mat_<char>(3, 3) << 0, -1, 0,
@@ -223,7 +257,9 @@ int main()
 														0, -1, 0);
 				filter2D(srcImg, srcImg, srcImg.depth(), sharpen_kernel);*/
 
-				inRange(srcImg, Scalar(poolRGB_B_Min, poolRGB_G_Min, poolRGB_R_Min), Scalar(poolRGB_B_Max, poolRGB_G_Max, poolRGB_R_Max), thdImg);
+				inRange(srcImg, Scalar(poolColor[0] - poolRange, poolColor[1]- poolRange, poolColor[2] - poolRange),
+								Scalar(poolColor[0] + poolRange, poolColor[1] + poolRange, poolColor[2] + poolRange), thdImg);
+				//inRange(srcImg, Scalar(poolRGB_B_Min, poolRGB_G_Min, poolRGB_R_Min), Scalar(poolRGB_B_Max, poolRGB_G_Max, poolRGB_R_Max), thdImg);
 				imshow("Threshold", thdImg);
 
 				//이미지 그레이스케일 변환
@@ -231,12 +267,12 @@ int main()
 
 				//이미지 가우시안블러 적용
 				GaussianBlur(thdImg, procImg, Size(3, 3), 0);
+				morphOps(procImg);
 
 				//원(당구공) 검출 (circles에 담는다)
 				vector<Vec3f> circles;				
 				HoughCircles(procImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2, MAX_BALL_SIZE, MIN_BALL_SIZE);
 
-				morphOps(procImg);
 				//캐니 변환
 				Canny(procImg, procImg, cTh1, cTh2);
 				imshow("Canny", procImg);
