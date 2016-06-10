@@ -1,10 +1,13 @@
-#include "setting.h"
-#include "button.h"
 #include <Windows.h>
 #include <iostream>
 #include <opencv2\imgproc.hpp>
 #include <opencv2\core\core.hpp>
 #include <opencv2\highgui\highgui.hpp>
+
+#include "setting.h"
+#include "button.h"
+#include "functions.h"
+
 
 using namespace cv; 
 using namespace std;
@@ -50,9 +53,9 @@ int poolRGB_R_Max = 120, poolRGB_G_Max = 180, poolRGB_B_Max = 180;
 double radiusMultiply = 2;
 
 //당구대 색상
-Scalar poolColor;
-int poolRange;
-bool poolColorSet = false;
+Scalar poolColor = Scalar(255, 255, 255);
+int poolRangeR = 50, poolRangeB = 85, poolRangeG = 85;
+bool poolColorSet = true;
 
 //화면에 마우스 조작을 했을 경우
 void callBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -90,7 +93,6 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 	//당구대 위치 설정
 	if (!poolSet)
 	{
-		btnPoolColor.setColor(srcImg.at<Scalar>(y, x));
 		//클릭하면 그 점을 당구대 꼭지점으로 설정한다.
 		if (event == EVENT_LBUTTONDOWN)
 		{
@@ -115,66 +117,27 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 	{
 		if (event == EVENT_LBUTTONUP)
 		{
-			poolColorSet = !poolColorSet;
-			btnPoolColor.setText(poolColorSet ? "Set Pool Color" : "Setting..");
+			poolColorSet = false;
+			btnPoolColor.setText("Setting..");
 		}
 	}
 
 	//당구대 색상 설정
 	if (!poolColorSet)
 	{
+		try {
+			btnPoolColor.setColor(srcImg.at<Vec3b>(y, x)[0], srcImg.at<Vec3b>(y, x)[1], srcImg.at<Vec3b>(y, x)[2]);
+		}
+		catch (Exception e) { cout << "당구대색에러" << e.msg << endl; }
 		//클릭하면 그 점을 당구대 색상으로 설정
 		if (event == EVENT_LBUTTONDOWN)
 		{
-
+			poolColor = btnPoolColor.getColor();
+			poolColorSet = true;
+			btnPoolColor.setText("Set Pool Color");
 		}
 	}
 
-}
-
-//교차점 구하는거
-Point* isIntersection(Point p1, Point p2, Point p3, Point p4) {
-	// Store the values for fast access and easy
-	// equations-to-code conversion
-	float x1 = p1.x, x2 = p2.x, x3 = p3.x, x4 = p4.x;
-	float y1 = p1.y, y2 = p2.y, y3 = p3.y, y4 = p4.y;
-
-	float d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-	// If d is zero, there is no intersection
-	if (d == 0) return NULL;
-
-	// Get the x and y
-	float pre = (x1*y2 - y1*x2), post = (x3*y4 - y3*x4);
-	float x = (pre * (x3 - x4) - (x1 - x2) * post) / d;
-	float y = (pre * (y3 - y4) - (y1 - y2) * post) / d;
-
-	// Check if the x and y coordinates are within both lines
-	if (x < min(x1, x2) || x > max(x1, x2) ||
-		x < min(x3, x4) || x > max(x3, x4)) return NULL;
-	if (y < min(y1, y2) || y > max(y1, y2) ||
-		y < min(y3, y4) || y > max(y3, y4)) return NULL;
-
-	// Return the point of intersection
-	Point* ret = new Point();
-	ret->x = x;
-	ret->y = y;
-	return ret;
-}
-
-//모프? 좀 더 뭉뚱그리는거같음
-void morphOps(Mat &thresh) {
-
-	//create structuring element that will be used to "dilate" and "erode" image.
-	//the element chosen here is a 3px by 3px rectangle
-	Mat erodeElement = getStructuringElement(MORPH_RECT, Size(2, 2));
-	//dilate with larger element so make sure object is nicely visible
-	Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2, 2));
-
-	erode(thresh, thresh, erodeElement);
-	erode(thresh, thresh, erodeElement);
-
-	dilate(thresh, thresh, dilateElement);
-	dilate(thresh, thresh, dilateElement);
 }
 
 int main()
@@ -196,7 +159,7 @@ int main()
 	namedWindow("Canny");
 	namedWindow("Threshold");
 	namedWindow("Setting");
-	namedWindow("Display", CV_WINDOW_FULLSCREEN);
+	namedWindow("Display", CV_WINDOW_FREERATIO);
 
 	resizeWindow("Main", IMG_W, IMG_H + PANEL_H);
 	resizeWindow("Setting", 400, 600);
@@ -207,7 +170,9 @@ int main()
 	createTrackbar("cCanny1", "Setting", &cTh1, 255);
 	createTrackbar("cCanny2", "Setting", &cTh2, 255);
 
-	createTrackbar("pool_range", "Setting", &poolRange, 50);
+	createTrackbar("pool_range_R", "Setting", &poolRangeR, 100);
+	createTrackbar("pool_range_G", "Setting", &poolRangeG, 100);
+	createTrackbar("pool_range_B", "Setting", &poolRangeB, 100);
 	/*
 	createTrackbar("poolR_m", "Setting", &poolRGB_R_Min, 255);
 	createTrackbar("poolG_m", "Setting", &poolRGB_G_Min, 255);
@@ -256,11 +221,12 @@ int main()
 														-1, 5, -1,
 														0, -1, 0);
 				filter2D(srcImg, srcImg, srcImg.depth(), sharpen_kernel);*/
-
-				inRange(srcImg, Scalar(poolColor[0] - poolRange, poolColor[1]- poolRange, poolColor[2] - poolRange),
-								Scalar(poolColor[0] + poolRange, poolColor[1] + poolRange, poolColor[2] + poolRange), thdImg);
+				
+				inRange(srcImg, Scalar(poolColor[0] - poolRangeB, poolColor[1] - poolRangeG, poolColor[2] - poolRangeR),
+								Scalar(poolColor[0] + poolRangeB, poolColor[1] + poolRangeG, poolColor[2] + poolRangeR), thdImg);
+				thdImg = ~thdImg;
+				
 				//inRange(srcImg, Scalar(poolRGB_B_Min, poolRGB_G_Min, poolRGB_R_Min), Scalar(poolRGB_B_Max, poolRGB_G_Max, poolRGB_R_Max), thdImg);
-				imshow("Threshold", thdImg);
 
 				//이미지 그레이스케일 변환
 				//cvtColor(thdImg, procImg, COLOR_BGR2GRAY, 0);
@@ -268,6 +234,8 @@ int main()
 				//이미지 가우시안블러 적용
 				GaussianBlur(thdImg, procImg, Size(3, 3), 0);
 				morphOps(procImg);
+
+				imshow("Threshold", procImg);
 
 				//원(당구공) 검출 (circles에 담는다)
 				vector<Vec3f> circles;				
@@ -380,8 +348,6 @@ int main()
 						ptE.x = round(x03 - IMG_W * (-b3));
 						ptE.y = round(y03 - IMG_W * (a3));
 
-						cout << t3 << endl;;
-
 						//당구대 안에만
 						ptTS			    = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[1].x, poolPos[0].y));
 
@@ -399,7 +365,7 @@ int main()
 							line(srcImg, *ptTS, *ptTE, Scalar(0, 0, 255));
 
 							//벽에 튕긴 후 예상경로
-							Point ptNE;
+							/*Point ptNE;
 							Point ptNS;
 							double t4 = -t3;
 							double a4 = cos(t4), b4 = sin(t4);
@@ -417,10 +383,8 @@ int main()
 								ptNE.y = round(ptTS->y - IMG_W * (a3));
 							}
 
-							
-
 							line(outImg, ptNS, ptNE, Scalar(255, 255, 255), 3);
-							line(srcImg, ptNS, ptNE, Scalar(0, 0, 255));
+							line(srcImg, ptNS, ptNE, Scalar(0, 0, 255));*/
 						}
 					}
 				}
@@ -432,7 +396,7 @@ int main()
 			
 			}
 			//현재 당구대 위치 설정중이면
-			else
+			else if(poolColorSet && !poolSet)
 			{
 				//십자선(가이드라인)을 그린다.
 				line(srcImg, Point(0, mY), Point(IMG_W, mY), Scalar(100, 100, 100));
@@ -453,6 +417,8 @@ int main()
 			//출력
 
 			imshow("Main", canvas);
+			outImg = outImg(Rect(poolPos[0], poolPos[1]));
+			//copyMakeBorder(outImg, outImg, 20, 20, 20, 20, BORDER_DEFAULT);
 			imshow("Display", outImg);
 		}
 		catch(Exception e)
