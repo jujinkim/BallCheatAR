@@ -39,8 +39,8 @@ void morphOps(Mat &thresh) {
 	Mat dilateElement = getStructuringElement(MORPH_RECT, Size(3, 3));
 
 	erode(thresh, thresh, erodeElement);
-	erode(thresh, thresh, erodeElement);
+	//erode(thresh, thresh, erodeElement);
 
 	dilate(thresh, thresh, dilateElement);
-	dilate(thresh, thresh, dilateElement);
+	//dilate(thresh, thresh, dilateElement);
 }

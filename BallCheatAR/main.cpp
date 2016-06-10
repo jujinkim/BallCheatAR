@@ -23,6 +23,8 @@ Point poolPos[2];
 Button btnResetPoolPos;
 Button chkLine;
 Button btnPoolColor;
+Button btnCuePointColor;
+Button btnCueStickColor;
 
 //메인 윈도우에 그려질 캔버스
 Mat3b canvas;
@@ -32,6 +34,7 @@ Mat srcImg;
 Mat procImg;
 Mat gryImg;
 Mat thdImg;
+Mat thdWhiteImg;
 Mat outImg;
 
 Mat img_lbl, stats, centroids;
@@ -43,19 +46,24 @@ int mX, mY;
 bool drawLine = false;
 
 //매개변수들
-int cParam1 = 80, cParam2 = 10;
+int cParam1 = 80, cParam2 = 9, cParam2W = 15;
 int cTh1 = 80, cTh2 = 20;
-
-int poolRGB_R_Min = 20, poolRGB_G_Min = 70, poolRGB_B_Min = 60;
-int poolRGB_R_Max = 120, poolRGB_G_Max = 180, poolRGB_B_Max = 180;
 
 //반지름
 double radiusMultiply = 2;
 
 //당구대 색상
 Scalar poolColor = Scalar(255, 255, 255);
-int poolRangeR = 50, poolRangeB = 85, poolRangeG = 85;
+int poolRangeH = 10, poolRangeS = 70, poolRangeV = 90;
 bool poolColorSet = true;
+
+//큐대 색상
+Scalar cuePntColor = Scalar(255, 255, 255);
+int cuePntCRangeH = 10,  cuePntCRangeS = 70,  cuePntCRangeV = 90;
+bool cuePntSet = true;
+Scalar cueStkColor = Scalar(255, 255, 255);
+int cueStkCRangeH = 10,  cueStkCRangeS = 70,  cueStkCRangeV = 90;
+bool cueStkSet = true;
 
 //화면에 마우스 조작을 했을 경우
 void callBackFunc(int event, int x, int y, int flags, void* userdata)
@@ -121,7 +129,6 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 			btnPoolColor.setText("Setting..");
 		}
 	}
-
 	//당구대 색상 설정
 	if (!poolColorSet)
 	{
@@ -138,6 +145,56 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 		}
 	}
 
+
+	//큐 포인트색상 설정시작버튼
+	if (btnCuePointColor.isInPos(x, y))
+	{
+		if (event == EVENT_LBUTTONUP)
+		{
+			cuePntSet = false;
+			btnCuePointColor.setText("...");
+		}
+	}
+	//큐 포인트색상 설정
+	if (!cuePntSet)
+	{
+		try {
+			btnCuePointColor.setColor(srcImg.at<Vec3b>(y, x)[0], srcImg.at<Vec3b>(y, x)[1], srcImg.at<Vec3b>(y, x)[2]);
+		}
+		catch (Exception e) { cout << "큐포인트색에러" << e.msg << endl; }
+		//클릭하면 그 점을 큐 포인트색상으로 설정
+		if (event == EVENT_LBUTTONDOWN)
+		{
+			cuePntColor = btnCuePointColor.getColor();
+			cuePntSet = true;
+			btnCuePointColor.setText("C_P_C");
+		}
+	}
+
+	//큐 막대색상 설정시작버튼
+	if (btnCueStickColor.isInPos(x, y))
+	{
+		if (event == EVENT_LBUTTONUP)
+		{
+			cueStkSet = false;
+			btnCueStickColor.setText("...");
+		}
+	}
+	//큐 막대색상 설정
+	if (!cueStkSet)
+	{
+		try {
+			btnCueStickColor.setColor(srcImg.at<Vec3b>(y, x)[0], srcImg.at<Vec3b>(y, x)[1], srcImg.at<Vec3b>(y, x)[2]);
+		}
+		catch (Exception e) { cout << "큐막대색에러" << e.msg << endl; }
+		//클릭하면 그 점을 큐 막대색상으로 설정
+		if (event == EVENT_LBUTTONDOWN)
+		{
+			cueStkColor = btnCueStickColor.getColor();
+			cueStkSet = true;
+			btnCueStickColor.setText("C_S_C");
+		}
+	}
 }
 
 int main()
@@ -158,6 +215,7 @@ int main()
 	namedWindow("Main");
 	namedWindow("Canny");
 	namedWindow("Threshold");
+	namedWindow("Threshold_W");
 	namedWindow("Setting");
 	namedWindow("Display", CV_WINDOW_FREERATIO);
 
@@ -167,20 +225,21 @@ int main()
 	//트랙바 생성
 	createTrackbar("cParam1", "Setting", &cParam1, 255);
 	createTrackbar("cParam2", "Setting", &cParam2, 255);
+	createTrackbar("cParam2W", "Setting", &cParam2W, 255);
 	createTrackbar("cCanny1", "Setting", &cTh1, 255);
 	createTrackbar("cCanny2", "Setting", &cTh2, 255);
 
-	createTrackbar("pool_range_R", "Setting", &poolRangeR, 100);
-	createTrackbar("pool_range_G", "Setting", &poolRangeG, 100);
-	createTrackbar("pool_range_B", "Setting", &poolRangeB, 100);
-	/*
-	createTrackbar("poolR_m", "Setting", &poolRGB_R_Min, 255);
-	createTrackbar("poolG_m", "Setting", &poolRGB_G_Min, 255);
-	createTrackbar("poolB_m", "Setting", &poolRGB_B_Min, 255);
-	createTrackbar("poolR_M", "Setting", &poolRGB_R_Max, 255);
-	createTrackbar("poolG_M", "Setting", &poolRGB_G_Max, 255);
-	createTrackbar("poolB_M", "Setting", &poolRGB_B_Max, 255);
-	*/
+	createTrackbar("pool_range_H", "Setting", &poolRangeH, 100);
+	createTrackbar("pool_range_S", "Setting", &poolRangeS, 100);
+	createTrackbar("pool_range_V", "Setting", &poolRangeV, 100);
+
+	createTrackbar("cue_p_range_H", "Setting", &cuePntCRangeH, 100);
+	createTrackbar("cue_p_range_S", "Setting", &cuePntCRangeS, 100);
+	createTrackbar("cue_p_range_V", "Setting", &cuePntCRangeV, 100);
+
+	createTrackbar("cue_s_range_V", "Setting", &cueStkCRangeH, 100);
+	createTrackbar("cue_s_range_S", "Setting", &cueStkCRangeS, 100);
+	createTrackbar("cue_s_range_V", "Setting", &cueStkCRangeV, 100);
 
 	//마우스 콜백함수 연결
 	setMouseCallback("Main", callBackFunc);
@@ -194,6 +253,8 @@ int main()
 		btnResetPoolPos = Button(canvas, 0, IMG_H, 260, PANEL_H, "Pool Position Resetting(LT)", Scalar(200, 200, 200));
 		chkLine = Button(canvas, IMG_W - 80, IMG_H, 80, PANEL_H, "Line X", Scalar(230, 230, 230));
 		btnPoolColor = Button(canvas, 280, IMG_H, 150, PANEL_H, "Reset pool color", poolColor);
+		btnCuePointColor = Button(canvas, 450, IMG_H, 30, PANEL_H, "C_P_C", cuePntColor);
+		btnCueStickColor = Button(canvas, 480, IMG_H, 30, PANEL_H, "C_S_C", cueStkColor);
 	}
 	catch (Exception e)
 	{
@@ -210,39 +271,53 @@ int main()
 		try
 		{
 			resize(srcImg, srcImg, Size(IMG_W, IMG_H));
+			cvtColor(srcImg, srcImg, COLOR_BGR2HSV);
+
 			//결과만 그릴 이미지
 			outImg = Mat(Size(srcImg.cols, srcImg.rows), srcImg.type(), Scalar(0, 0, 0));
 
 			//당구대 위치와 색깔이 설정 된 상태이면
-			if (poolSet && poolColorSet)
+			if (poolSet && poolColorSet && cuePntSet && cueStkSet)
 			{
+				procImg = srcImg;
 				//선명하게
 				/*Mat sharpen_kernel = (Mat_<char>(3, 3) << 0, -1, 0,
 														-1, 5, -1,
 														0, -1, 0);
 				filter2D(srcImg, srcImg, srcImg.depth(), sharpen_kernel);*/
 				
-				inRange(srcImg, Scalar(poolColor[0] - poolRangeB, poolColor[1] - poolRangeG, poolColor[2] - poolRangeR),
-								Scalar(poolColor[0] + poolRangeB, poolColor[1] + poolRangeG, poolColor[2] + poolRangeR), thdImg);
-				thdImg = ~thdImg;
-				
-				//inRange(srcImg, Scalar(poolRGB_B_Min, poolRGB_G_Min, poolRGB_R_Min), Scalar(poolRGB_B_Max, poolRGB_G_Max, poolRGB_R_Max), thdImg);
-
 				//이미지 그레이스케일 변환
-				//cvtColor(thdImg, procImg, COLOR_BGR2GRAY, 0);
+				/*cvtColor(srcImg, gryImg, COLOR_BGR2GRAY, 0);
+				threshold(gryImg, thdImg, 0, 255, THRESH_BINARY_INV + THRESH_OTSU);*/
+
+				inRange(procImg, Scalar(poolColor[0] - poolRangeH, poolColor[1] - poolRangeS, poolColor[2] - poolRangeV),
+								Scalar(poolColor[0] + poolRangeH, poolColor[1] + poolRangeS, poolColor[2] + poolRangeV), thdImg);
+				inRange(procImg, Scalar(0, 0, 180), Scalar(255, 70, 255), thdWhiteImg);
+				thdImg = ~thdImg;
+				morphOps(thdImg);
+				morphOps(thdWhiteImg);
+
+				GaussianBlur(thdImg, thdImg, Size(5, 5), 2, 2);
+
+				imshow("Threshold", thdImg);
 
 				//이미지 가우시안블러 적용
-				GaussianBlur(thdImg, procImg, Size(3, 3), 0);
-				morphOps(procImg);
+				GaussianBlur(thdWhiteImg, thdWhiteImg, Size(3, 3), 2,2);
+				/*morphOps(procImg);
+				morphOps(thdWhiteImg);*/
 
-				imshow("Threshold", procImg);
+				
+				imshow("Threshold_W", thdWhiteImg);
 
 				//원(당구공) 검출 (circles에 담는다)
 				vector<Vec3f> circles;				
-				HoughCircles(procImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2, MAX_BALL_SIZE, MIN_BALL_SIZE);
+				HoughCircles(thdImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2, MAX_BALL_SIZE, 1);
+				vector<Vec3f> circlesWhite;
+				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
+
 
 				//캐니 변환
-				Canny(procImg, procImg, cTh1, cTh2);
+				Canny(thdImg, procImg, cTh1, cTh2);
 				imshow("Canny", procImg);
 
 				//라인(큐대) 검출(lines에 담는다)
@@ -280,6 +355,36 @@ int main()
 					circle(srcImg, Point((*itc)[0], (*itc)[1]), (*itc)[2], Scalar(255,0,0), 2);
 
 					++itc;
+				}
+
+				//흰공
+				vector<Vec3f>::const_iterator itcW = circlesWhite.begin();
+				while (itcW != circlesWhite.end())
+				{
+					Point curCircleP = Point((*itcW)[0], (*itcW)[1]);
+					//당구대 밖에 있는 공은 지운다.
+					if (!curCircleP.inside(Rect(pntGuideline1, pntGuideline2)))
+					{
+						circlesWhite.erase(itcW);
+						itcW = circlesWhite.begin();
+						continue;
+					}
+					//당구대 구석에 근접한 공도 지운다.
+					if (norm(curCircleP - poolPos[0]) < DIST_BALL ||
+						norm(curCircleP - poolPos[1]) < DIST_BALL ||
+						norm(curCircleP - Point(poolPos[0].x, poolPos[1].y)) < DIST_BALL ||
+						norm(curCircleP - Point(poolPos[1].x, poolPos[0].y)) < DIST_BALL)
+					{
+						circlesWhite.erase(itcW);
+						itcW = circlesWhite.begin();
+						continue;
+					}
+
+					//살아남은 공은 그린다
+					//circle(outImg, Point((*itc)[0], (*itc)[1]), (*itc)[2] * radiusMultiply, Scalar(255, 255, 255), 2);
+					circle(srcImg, Point((*itcW)[0], (*itcW)[1]), (*itcW)[2]+5, Scalar(0, 255, 0), 2);
+
+					++itcW;
 				}
 
 				////////////////////선 그리기///////////////////////
@@ -396,7 +501,7 @@ int main()
 			
 			}
 			//현재 당구대 위치 설정중이면
-			else if(poolColorSet && !poolSet)
+			else if((poolColorSet || cuePntSet || cueStkSet) && !poolSet)
 			{
 				//십자선(가이드라인)을 그린다.
 				line(srcImg, Point(0, mY), Point(IMG_W, mY), Scalar(100, 100, 100));
@@ -431,8 +536,10 @@ int main()
 	}
 	srcImg.release();
 	outImg.release();
+	gryImg.release();
 	procImg.release();
 	thdImg.release();
+	thdWhiteImg.release();
 	capture.release();
 	cvDestroyAllWindows();
 	
