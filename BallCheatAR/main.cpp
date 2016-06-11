@@ -49,9 +49,13 @@ int cTh1 = 80, cTh2 = 20;
 //반지름
 double radiusMultiply = 2;
 
+//Perspective Transform Parameter (50 -> middle, 0~100)
+int perspectiveParameter = 50;
+
 //White ball position
 Point WhiteBallPos;
 int whiteBallLostCount = 0;
+//int whiteBallROIRange = 150;	//흰 공을 중심으로 ROI를 하나 더 만든다. 이것은 흰 공 주변의 '큐대'를 탐지하는 용도이다.
 
 #pragma region 당구대 위치 설정용
 bool poolSet = false;	//당구대 위치 수동세팅 완료됐는지
@@ -72,10 +76,10 @@ bool poolColorSet = true;
 
 //큐대 색상
 Scalar cuePntColor = Scalar(255, 255, 255);
-int cuePntCRangeH = Range_H_INIT, cuePntCRangeS = Range_S_INIT, cuePntCRangeV = Range_V_INIT;
+int cuePntCRangeH = CUE_H_INIT, cuePntCRangeS = CUE_S_INIT, cuePntCRangeV = CUE_V_INIT;
 bool cuePntSet = true;
 Scalar cueStkColor = Scalar(255, 255, 255);
-int cueStkCRangeH = Range_H_INIT, cueStkCRangeS = Range_S_INIT, cueStkCRangeV = Range_V_INIT;
+int cueStkCRangeH = CUE_H_INIT, cueStkCRangeS = CUE_S_INIT, cueStkCRangeV = CUE_V_INIT;
 bool cueStkSet = true;
 #pragma endregion
 
@@ -235,32 +239,36 @@ int main()
 	namedWindow("Threshold");
 	namedWindow("Threshold_W");
 	namedWindow("Setting");
+	namedWindow("Setting HSV Range");
 	namedWindow("Display", CV_WINDOW_FREERATIO);
 
 	resizeWindow("Main", IMG_W, IMG_H + PANEL_H);
-	resizeWindow("Setting", 400, 600);
+	resizeWindow("Setting", 400, 170);
+	resizeWindow("Setting", 500, 500);
 	#pragma endregion
 
 	#pragma region  Generate Trackbars
 	createTrackbar("RoI Range", "Setting", &roiRange, 50);
+	//createTrackbar("WhiteBall RoIRange", "Setting", &whiteBallROIRange, 150);
 
 	createTrackbar("cParam1", "Setting", &cParam1, 255);
 	createTrackbar("cParam2", "Setting", &cParam2, 255);
 	createTrackbar("cParam2W", "Setting", &cParam2W, 255);
 	/*createTrackbar("cCanny1", "Setting", &cTh1, 255);
 	createTrackbar("cCanny2", "Setting", &cTh2, 255);*/
+	createTrackbar("output Perspective", "Setting", &perspectiveParameter, 100);
 
-	createTrackbar("pool_range_H", "Setting", &poolRangeH, 100);
-	createTrackbar("pool_range_S", "Setting", &poolRangeS, 100);
-	createTrackbar("pool_range_V", "Setting", &poolRangeV, 100);
+	createTrackbar("pool_range_H", "Setting HSV Range", &poolRangeH, 100);
+	createTrackbar("pool_range_S", "Setting HSV Range", &poolRangeS, 100);
+	createTrackbar("pool_range_V", "Setting HSV Range", &poolRangeV, 100);
 
-	createTrackbar("cue_p_range_H", "Setting", &cuePntCRangeH, 100);
-	createTrackbar("cue_p_range_S", "Setting", &cuePntCRangeS, 100);
-	createTrackbar("cue_p_range_V", "Setting", &cuePntCRangeV, 100);
+	createTrackbar("cue_p_range_H", "Setting HSV Range", &cuePntCRangeH, 100);
+	createTrackbar("cue_p_range_S", "Setting HSV Range", &cuePntCRangeS, 100);
+	createTrackbar("cue_p_range_V", "Setting HSV Range", &cuePntCRangeV, 100);
 
-	createTrackbar("cue_s_range_H", "Setting", &cueStkCRangeH, 100);
-	createTrackbar("cue_s_range_S", "Setting", &cueStkCRangeS, 100);
-	createTrackbar("cue_s_range_V", "Setting", &cueStkCRangeV, 100);
+	createTrackbar("cue_s_range_H", "Setting HSV Range", &cueStkCRangeH, 100);
+	createTrackbar("cue_s_range_S", "Setting HSV Range", &cueStkCRangeS, 100);
+	createTrackbar("cue_s_range_V", "Setting HSV Range", &cueStkCRangeV, 100);
 	#pragma endregion
 	
 	//Mouse Callback method bind.
@@ -326,27 +334,36 @@ int main()
 				inRange(procImg, Scalar(poolColor[0] - poolRangeH, poolColor[1] - poolRangeS, poolColor[2] - poolRangeV),
 								 Scalar(poolColor[0] + poolRangeH, poolColor[1] + poolRangeS, poolColor[2] + poolRangeV), thdImg);
 				inRange(procImg, Scalar(0, 0, 180), Scalar(255, 70, 255), thdWhiteImg);
+				thdImg = ~thdImg;
+
+				//#pragma region 인식 ROI 설정
+				//Point wbPosFull(WhiteBallPos.x + poolPosROI[0].x, WhiteBallPos.y + poolPosROI[0].y);
+				//Rect whiteBallRect(wbPosFull.x - whiteBallROIRange, wbPosFull.y - whiteBallROIRange, whiteBallROIRange * 2, whiteBallROIRange * 2);
+				//if (wbPosFull.x - whiteBallROIRange < 0) whiteBallRect.x = wbPosFull.x;
+				//if (wbPosFull.y - whiteBallROIRange < 0) whiteBallRect.y = wbPosFull.y;
+				//if (wbPosFull.x + whiteBallROIRange >= hsvImg.cols) whiteBallRect.width = hsvImg.cols - wbPosFull.x;
+				//if (wbPosFull.y + whiteBallROIRange >= hsvImg.rows) whiteBallRect.height = hsvImg.rows - wbPosFull.y;
+				//rectangle(srcImg, whiteBallRect, Scalar(0, 255, 255));
+				//#pragma endregion 
+
 				inRange(procImg, Scalar(cuePntColor[0] - cuePntCRangeH, cuePntColor[1] - cuePntCRangeS, cuePntColor[2] - cuePntCRangeV),
 								 Scalar(cuePntColor[0] + cuePntCRangeH, cuePntColor[1] + cuePntCRangeS, cuePntColor[2] + cuePntCRangeV), proc_cuePImg);
 				inRange(procImg, Scalar(cueStkColor[0] - cueStkCRangeH, cueStkColor[1] - cueStkCRangeS, cueStkColor[2] - cueStkCRangeV),
 								 Scalar(cueStkColor[0] + cueStkCRangeH, cueStkColor[1] + cueStkCRangeS, cueStkColor[2] + cueStkCRangeV), proc_cueSImg);
-				thdImg = ~thdImg;
+				
 
 				//morph -> 빈공간 없애고 작은점 없애고
 				morphOpCl(thdImg, 3, 3);
 				morphOpCl(thdWhiteImg, 3, 3);
 				morphOpCl(proc_cuePImg, 3, 3);
 				morphOpCl(proc_cueSImg, 3, 3);
-
-				GaussianBlur(thdImg, thdImg, Size(5, 5), 2, 2);
+				
+				GaussianBlur(thdImg, thdImg, Size(3, 3), 2, 2);
 
 				imshow("Threshold", thdImg);
 
 				//이미지 가우시안블러 적용
 				GaussianBlur(thdWhiteImg, thdWhiteImg, Size(3, 3), 2,2);
-				/*morphOps(procImg);
-				morphOps(thdWhiteImg);*/
-
 				
 				imshow("Threshold_W", thdWhiteImg);
 
@@ -356,10 +373,21 @@ int main()
 				vector<Vec3f> circlesWhite;
 				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
 
-
-				//캐니 변환
-				Canny(thdImg, procImg, cTh1, cTh2);
-				imshow("Canny", proc_cueSImg);
+				//큐대 중심점 검출(라벨링)
+				int numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids);
+				//가장큰거
+				int max = -1, idx = 0;
+				for (int i = 0; i < numOfLables; i++)
+				{
+					int area = stats.at<int>(i, CC_STAT_AREA);
+					if (max < area)
+					{
+						max = area;
+						idx = i;
+					}
+				}
+				//stats.at()
+				
 
 				//라인(큐대) 검출(lines에 담는다)
 				vector<Vec2f> lines;
@@ -374,7 +402,7 @@ int main()
 				{
 					Point curCircleP = Point((*itc)[0], (*itc)[1]);
 					//당구대 밖에 있는 공은 지운다.
-					if (!curCircleP.inside(Rect(pntGuideline1, pntGuideline2)))//(Point(roiRange, roiRange), Size(pntGuideline2))))
+					if (!curCircleP.inside(Rect(pntGuideline1, pntGuideline2)))
 					{
 						circles.erase(itc);
 						itc = circles.begin();
@@ -555,7 +583,21 @@ int main()
 				rectangle(srcImg, Rect(poolPos[0], poolPos[1]), Scalar(255, 255, 255), 2);
 				rectangle(srcImg, Rect(pntGuideline1 + poolPosROI[0], pntGuideline2 + poolPosROI[0]), Scalar(0, 255, 255), 1);
 				rectangle(outImg, Rect(roiRange,roiRange, poolWidth, poolHeight), Scalar(255, 255, 255), 2);
-			
+
+				#pragma region perspectiveTransform 변환
+				/*Point2f p1[4], p2[4];
+				p1[0] = Point2f(0, 0);
+				p1[1] = Point2f(outImg.cols, 0);
+				p1[2] = Point2f(outImg.cols, outImg.rows);
+				p1[3] = Point2f(0, outImg.rows);
+
+				p2[0] = Point2f(perspectiveParameter>50 ? perspectiveParameter - 50 : 0, 0);
+				p2[1] = Point2f(outImg.cols - (perspectiveParameter>50 ? perspectiveParameter - 50 : 0), 0);
+				p2[2] = Point2f(outImg.cols - perspectiveParameter<50 ? 50 - perspectiveParameter : 0, outImg.rows);
+				p2[3] = Point2f(perspectiveParameter<50 ? 50 - perspectiveParameter : 0, outImg.rows);
+				Mat m = getPerspectiveTransform(p1, p2);
+				warpPerspective(outImg, outImg, m, Size(outImg.cols, outImg.rows));*/
+				#pragma endregion
 			}
 			//현재 당구대 위치 설정중이면
 			else if((poolColorSet || cuePntSet || cueStkSet) && !poolSet)
@@ -571,7 +613,6 @@ int main()
 				if(poolPos[i].x >= 0 && poolPos[i].y >= 0)
 					circle(srcImg, poolPos[i], 3, Scalar(0,0,255));
 			}
-			
 
 			//적용된 이미지 출력
 			srcImg.copyTo(canvas(Rect(0, 0, srcImg.cols, srcImg.rows)));

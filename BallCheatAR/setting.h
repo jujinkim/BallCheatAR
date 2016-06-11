@@ -8,6 +8,9 @@
 #define Range_H_INIT 10
 #define Range_S_INIT 55
 #define Range_V_INIT 90
+#define CUE_H_INIT 40
+#define CUE_S_INIT 40
+#define CUE_V_INIT 40
 
 #define MIN_BALL_SIZE 13
 #define MAX_BALL_SIZE 15
