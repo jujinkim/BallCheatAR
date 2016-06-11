@@ -235,7 +235,7 @@ int main()
 
 	#pragma region Generate Windows
 	namedWindow("Main");
-	namedWindow("Canny");
+	namedWindow("Cue");
 	namedWindow("Threshold");
 	namedWindow("Threshold_W");
 	namedWindow("Setting");
@@ -333,7 +333,7 @@ int main()
 
 				inRange(procImg, Scalar(poolColor[0] - poolRangeH, poolColor[1] - poolRangeS, poolColor[2] - poolRangeV),
 								 Scalar(poolColor[0] + poolRangeH, poolColor[1] + poolRangeS, poolColor[2] + poolRangeV), thdImg);
-				inRange(procImg, Scalar(0, 0, 180), Scalar(255, 70, 255), thdWhiteImg);
+				inRange(procImg, Scalar(0, 0, 140), Scalar(179, 70, 255), thdWhiteImg);
 				thdImg = ~thdImg;
 
 				//#pragma region 인식 ROI 설정
@@ -353,7 +353,8 @@ int main()
 				
 
 				//morph -> 빈공간 없애고 작은점 없애고
-				morphOpCl(thdImg, 3, 3);
+				morphOpCl(thdImg, 5, 5);
+				//erode(thdImg, thdImg, getStructuringElement(MORPH_ELLIPSE, Size(20, 20))); <- 침식연산을 고려해봐도 좋을거같다.
 				morphOpCl(thdWhiteImg, 3, 3);
 				morphOpCl(proc_cuePImg, 3, 3);
 				morphOpCl(proc_cueSImg, 3, 3);
@@ -372,26 +373,47 @@ int main()
 				HoughCircles(thdImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2, MAX_BALL_SIZE, 1);
 				vector<Vec3f> circlesWhite;
 				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
-
-				//큐대 중심점 검출(라벨링)
-				int numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids);
-				//가장큰거
-				int max = -1, idx = 0;
-				for (int i = 0; i < numOfLables; i++)
-				{
-					int area = stats.at<int>(i, CC_STAT_AREA);
-					if (max < area)
-					{
-						max = area;
-						idx = i;
-					}
-				}
-				//stats.at()
 				
+				if (drawLine) {
+					//큐대 중심점 검출(라벨링)
+					int numOfLables, max, idx, cx, cy;
 
-				//라인(큐대) 검출(lines에 담는다)
-				vector<Vec2f> lines;
-				if(drawLine) HoughLines(procImg, lines, 1, CV_PI / 180, 150);
+					numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids, 8, CV_32S);
+					max = -1; idx = 0;
+					for (int i = 1; i < numOfLables; i++)
+					{
+						int area = stats.at<int>(i, CC_STAT_AREA);
+						if (max < area)
+						{
+							max = area;
+							idx = i;
+						}
+					}
+					cx = centroids.at<double>(idx, 0);
+					cy = centroids.at<double>(idx, 1);
+					circle(srcImg, Point(cx + poolPosROI[0].x, cy + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
+
+					numOfLables = connectedComponentsWithStats(proc_cueSImg, img_lbl, stats, centroids, 8, CV_32S);
+					max = -1; idx = 0;
+					for (int i = 1; i < numOfLables; i++)
+					{
+						int area = stats.at<int>(i, CC_STAT_AREA);
+						if (max < area)
+						{
+							max = area;
+							idx = i;
+						}
+					}
+					cx = centroids.at<double>(idx, 0);
+					cy = centroids.at<double>(idx, 1);
+					circle(srcImg, Point(cx + poolPosROI[0].x, cy + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
+
+					imshow("Cue", proc_cuePImg);
+					//double *centroid = centroids.at<double*>(idx, 0); //중심좌표
+					//int x = centroid[0];
+					//int y = centroid[1];
+					//circle(srcImg, Point(x, y), 3, Scalar(255, 255, 0), 2);
+				}
 
 				//검출된 원 중 가장자리에 붙어있거나 가장자리 넘어간 원들을 다 지운다
 				////////////////////원 그리기///////////////////////
@@ -470,113 +492,6 @@ int main()
 					circle(srcImg, Point(WhiteBallPos.x + poolPosROI[0].x, WhiteBallPos.y + poolPosROI[0].y), MAX_BALL_SIZE + 5, Scalar(0, 255, 0), 2);
 				}
 				else cout << "White Ball Lost" << endl;
-
-				////////////////////선 그리기///////////////////////
-				if (drawLine) {
-					//당구대 바깥을 겨냥한 선들은 다 지운다
-					vector<Vec2f>::const_iterator itc2 = lines.begin();
-					while (itc2 != lines.end())
-					{
-						double a = cos((*itc2)[1]), b = sin((*itc2)[1]);
-						double x0 = a*((*itc2)[0]), y0 = b*((*itc2)[0]);
-						Point pt1, pt2;
-						pt1.x = round(x0 + IMG_W * (-b));
-						pt1.y = round(y0 + IMG_W * (a));
-						pt2.x = round(x0 - IMG_W * (-b));
-						pt2.y = round(y0 - IMG_W * (a));
-
-						//사각형의 각 변과의 교점을 찾는다. 교점이 하나도 없으면 당구대 밖이므로 지운다.
-					   /*if(!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[1].x, poolPos[0].y)) &&
-							!isIntersection(pt1, pt2, poolPos[0], Point(poolPos[0].x, poolPos[1].y)) &&
-							!isIntersection(pt1, pt2, Point(poolPos[0].x, poolPos[1].y), poolPos[1]) &&
-							!isIntersection(pt1, pt2, Point(poolPos[1].x, poolPos[0].y), poolPos[1]))*/
-						if (!isIntersection(pt1, pt2, pntGuideline1, Point(pntGuideline2.x, pntGuideline1.y)) &&
-							!isIntersection(pt1, pt2, pntGuideline1, Point(pntGuideline1.x, pntGuideline2.y)) &&
-							!isIntersection(pt1, pt2, Point(pntGuideline1.x, pntGuideline2.y), pntGuideline2) &&
-							!isIntersection(pt1, pt2, Point(pntGuideline2.x, pntGuideline1.y), pntGuideline2))
-						{
-							lines.erase(itc2);
-							itc2 = lines.begin();
-							continue;
-						}
-
-						++itc2;
-					}
-
-					////살아남은 라인을 그린다. 
-					/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
-					Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
-					if (lines.size() == 2)
-					{
-						itc2 = lines.begin();
-						double t1 = (*itc2)[1];
-						double a1 = cos(t1), b1 = sin(t1);
-						double x01 = a1*((*itc2)[0]), y01 = b1*((*itc2)[0]);
-						Point pt1, pt2, pt3, pt4, ptS, ptE, *ptTS = NULL, *ptTE = NULL;
-						pt1.x = round(x01 + IMG_W * (-b1));
-						pt1.y = round(y01 + IMG_W * (a1));
-						pt2.x = round(x01 - IMG_W * (-b1));
-						pt2.y = round(y01 - IMG_W * (a1));
-						line(srcImg, pt1, pt2, Scalar(255, 255, 255));
-						itc2 = lines.end() - 1;
-						double t2 = (*itc2)[1];
-						double a2 = cos(t2), b2 = sin(t2);
-						double x02 = a2*((*itc2)[0]), y02 = b2*((*itc2)[0]);
-						pt3.x = round(x02 + IMG_W * (-b2));
-						pt3.y = round(y02 + IMG_W * (a2));
-						pt4.x = round(x02 - IMG_W * (-b2));
-						pt4.y = round(y02 - IMG_W * (a2));
-						line(srcImg, pt3, pt4, Scalar(255, 255, 255));
-
-						//최종 선분의 각도(t3)와 좌표(x03, y03)
-						double t3 = (t1 + t2) / 2;
-						double a3 = cos(t3), b3 = sin(t3);
-						double x03 = (x01 + x02) / 2, y03 = (y01 + y02) / 2;
-						ptS.x = round(x03 + IMG_W * (-b3));
-						ptS.y = round(y03 + IMG_W * (a3));
-						ptE.x = round(x03 - IMG_W * (-b3));
-						ptE.y = round(y03 - IMG_W * (a3));
-
-						//당구대 안에만
-						ptTS			    = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[1].x, poolPos[0].y));
-
-						if (!ptTS)	   ptTS = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[0].x, poolPos[1].y));
-						else if(!ptTE) ptTE = isIntersection(ptS, ptE, poolPos[0], Point(poolPos[0].x, poolPos[1].y));
-
-						if (!ptTS)		ptTS = isIntersection(ptS, ptE, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);
-						else if (!ptTE) ptTE = isIntersection(ptS, ptE, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);
-
-						if (!ptTS)		ptTS = isIntersection(ptS, ptE, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);
-						else if (!ptTE) ptTE = isIntersection(ptS, ptE, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);
-
-						if (ptTS && ptTE) {
-							line(outImg, *ptTS, *ptTE, Scalar(255, 255, 255), 3);
-							line(srcImg, *ptTS, *ptTE, Scalar(0, 0, 255));
-
-							//벽에 튕긴 후 예상경로
-							/*Point ptNE;
-							Point ptNS;
-							double t4 = -t3;
-							double a4 = cos(t4), b4 = sin(t4);
-
-							if (abs(norm(pt1 - pt3)) < abs(norm(pt2 - pt4)))
-							{
-								ptNS = *ptTS;
-								ptNE.x = round(ptTE->x - IMG_W * (-b4));
-								ptNE.y = round(ptTE->y - IMG_W * (a3));
-							}
-							else
-							{
-								ptNS = *ptTE;
-								ptNE.x = round(ptTS->x - IMG_W * (-b4));
-								ptNE.y = round(ptTS->y - IMG_W * (a3));
-							}
-
-							line(outImg, ptNS, ptNE, Scalar(255, 255, 255), 3);
-							line(srcImg, ptNS, ptNE, Scalar(0, 0, 255));*/
-						}
-					}
-				}
 
 				//당구대 가장자리 선을 그린다
 				rectangle(srcImg, Rect(poolPosROI[0], poolPosROI[1]), Scalar(0, 0, 255), 1);
