@@ -30,17 +30,33 @@ Point* isIntersection(Point p1, Point p2, Point p3, Point p4) {
 }
 
 //모프? 좀 더 뭉뚱그리는거같음
-void morphOps(Mat &thresh) {
+void morphOpen(Mat &thresh, int w, int h) {
 
 	//create structuring element that will be used to "dilate" and "erode" image.
 	//the element chosen here is a 3px by 3px rectangle
-	Mat erodeElement = getStructuringElement(MORPH_RECT, Size(3, 3));
+	Mat erodeElement = getStructuringElement(MORPH_ELLIPSE, Size(w, h));
 	//dilate with larger element so make sure object is nicely visible
-	Mat dilateElement = getStructuringElement(MORPH_RECT, Size(3, 3));
+	Mat dilateElement = getStructuringElement(MORPH_ELLIPSE, Size(w, h));
 
 	erode(thresh, thresh, erodeElement);
-	//erode(thresh, thresh, erodeElement);
+	dilate(thresh, thresh, dilateElement);
+}
+
+void morphClose(Mat &thresh, int w, int h ) {
+
+	//create structuring element that will be used to "dilate" and "erode" image.
+	//the element chosen here is a 3px by 3px rectangle
+	Mat erodeElement = getStructuringElement(MORPH_ELLIPSE, Size(w, h));
+	//dilate with larger element so make sure object is nicely visible
+	Mat dilateElement = getStructuringElement(MORPH_ELLIPSE, Size(w, h));
 
 	dilate(thresh, thresh, dilateElement);
-	//dilate(thresh, thresh, dilateElement);
+	erode(thresh, thresh, erodeElement);
 }
+
+void morphOpCl(Mat &thresh, int w, int h)
+{
+	morphOpen(thresh, w, h);
+	morphClose(thresh, w, h);
+}
+

@@ -6,4 +6,6 @@
 using namespace cv;
 
 Point* isIntersection(Point p1, Point p2, Point p3, Point p4);
-void morphOps(Mat &thresh);
+void morphOpen(Mat &thresh, int w, int h);
+void morphClose(Mat &thresh, int w, int h);
+void morphOpCl(Mat &thresh, int w, int h);

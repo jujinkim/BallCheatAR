@@ -31,10 +31,13 @@ Mat3b canvas;
 
 //카메라 프레임을 저장할 변수
 Mat srcImg;
+Mat hsvImg;
 Mat procImg;
 Mat gryImg;
 Mat thdImg;
 Mat thdWhiteImg;
+Mat proc_cuePImg;
+Mat proc_cueSImg;
 Mat outImg;
 
 Mat img_lbl, stats, centroids;
@@ -139,7 +142,7 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 		//클릭하면 그 점을 당구대 색상으로 설정
 		if (event == EVENT_LBUTTONDOWN)
 		{
-			poolColor = btnPoolColor.getColor();
+			poolColor = Scalar(hsvImg.at<Vec3b>(y, x));
 			poolColorSet = true;
 			btnPoolColor.setText("Set Pool Color");
 		}
@@ -271,7 +274,7 @@ int main()
 		try
 		{
 			resize(srcImg, srcImg, Size(IMG_W, IMG_H));
-			cvtColor(srcImg, srcImg, COLOR_BGR2HSV);
+			cvtColor(srcImg, hsvImg, COLOR_BGR2HSV);
 
 			//결과만 그릴 이미지
 			outImg = Mat(Size(srcImg.cols, srcImg.rows), srcImg.type(), Scalar(0, 0, 0));
@@ -279,7 +282,7 @@ int main()
 			//당구대 위치와 색깔이 설정 된 상태이면
 			if (poolSet && poolColorSet && cuePntSet && cueStkSet)
 			{
-				procImg = srcImg;
+				procImg = hsvImg;
 				//선명하게
 				/*Mat sharpen_kernel = (Mat_<char>(3, 3) << 0, -1, 0,
 														-1, 5, -1,
@@ -291,11 +294,15 @@ int main()
 				threshold(gryImg, thdImg, 0, 255, THRESH_BINARY_INV + THRESH_OTSU);*/
 
 				inRange(procImg, Scalar(poolColor[0] - poolRangeH, poolColor[1] - poolRangeS, poolColor[2] - poolRangeV),
-								Scalar(poolColor[0] + poolRangeH, poolColor[1] + poolRangeS, poolColor[2] + poolRangeV), thdImg);
+								 Scalar(poolColor[0] + poolRangeH, poolColor[1] + poolRangeS, poolColor[2] + poolRangeV), thdImg);
 				inRange(procImg, Scalar(0, 0, 180), Scalar(255, 70, 255), thdWhiteImg);
+				inRange(procImg, Scalar(cuePntColor[0] + cuePntCRangeH, cuePntColor[1] + cuePntCRangeS, cuePntColor[2] + cuePntCRangeV),
+								 Scalar(cuePntColor[0] - cuePntCRangeH, cuePntColor[1] - cuePntCRangeS, cuePntColor[2] - cuePntCRangeV), proc_cuePImg);
+				inRange(procImg, Scalar(cueStkColor[0] + cueStkCRangeH, cueStkColor[1] + cueStkCRangeS, cueStkColor[2] + cueStkCRangeV),
+								 Scalar(cueStkColor[0] - cueStkCRangeH, cueStkColor[1] - cueStkCRangeS, cueStkColor[2] - cueStkCRangeV), proc_cueSImg);
 				thdImg = ~thdImg;
-				morphOps(thdImg);
-				morphOps(thdWhiteImg);
+				morphOpCl(thdImg, 3, 3);
+				morphOpCl(thdWhiteImg, 3, 3);
 
 				GaussianBlur(thdImg, thdImg, Size(5, 5), 2, 2);
 
@@ -359,6 +366,7 @@ int main()
 
 				//흰공
 				vector<Vec3f>::const_iterator itcW = circlesWhite.begin();
+				float maxRadius = 0;
 				while (itcW != circlesWhite.end())
 				{
 					Point curCircleP = Point((*itcW)[0], (*itcW)[1]);
@@ -380,11 +388,23 @@ int main()
 						continue;
 					}
 
-					//살아남은 공은 그린다
-					//circle(outImg, Point((*itc)[0], (*itc)[1]), (*itc)[2] * radiusMultiply, Scalar(255, 255, 255), 2);
-					circle(srcImg, Point((*itcW)[0], (*itcW)[1]), (*itcW)[2]+5, Scalar(0, 255, 0), 2);
+					//최대 반지름을 저장한다
+					if((*itcW)[2] > maxRadius)
+						maxRadius = (*itcW)[2];
+					else
+					{
+						//최대반지름보다 작으면 지운다.
+						circlesWhite.erase(itcW);
+						itcW = circlesWhite.begin();
+						continue;
+					}
 
 					++itcW;
+				}
+				//흰 공은 하나만 그린다.
+				if (circlesWhite.size() > 0) {
+					circle(outImg, Point(circlesWhite[0][0], circlesWhite[0][1]), circlesWhite[0][2] + 20, Scalar(255, 255, 255), 15);
+					circle(srcImg, Point(circlesWhite[0][0], circlesWhite[0][1]), circlesWhite[0][2] + 5, Scalar(0, 255, 0), 2);
 				}
 
 				////////////////////선 그리기///////////////////////
@@ -422,7 +442,7 @@ int main()
 					////살아남은 라인을 그린다. 
 					/*Point pt1 = Point((*itc2)[0], (*itc2)[1]);
 					Point pt2 = Point((*itc2)[2], (*itc2)[3]);*/
-					if (lines.size() > 1)
+					if (lines.size() == 2)
 					{
 						itc2 = lines.begin();
 						double t1 = (*itc2)[1];
