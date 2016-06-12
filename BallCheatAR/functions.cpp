@@ -75,7 +75,7 @@ Point* calcEndOfLinePoint(Point startP, float radian, Point barPoint1, Point bar
 {
 	Point pE;
 	pE.x = (int(round(startP.x + 1000 * cos(radian))));
-	pE.x = (int(round(startP.y + 1000 * sin(radian))));
+	pE.y = (int(round(startP.y + 1000 * sin(radian))));
 
 	return isIntersection(startP, pE, barPoint1, barPoint2);
 }

@@ -356,8 +356,8 @@ int main()
 				morphOpCl(thdImg, 5, 5);
 				//erode(thdImg, thdImg, getStructuringElement(MORPH_ELLIPSE, Size(20, 20))); <- 침식연산을 고려해봐도 좋을거같다.
 				morphOpCl(thdWhiteImg, 3, 3);
-				morphOpCl(proc_cuePImg, 3, 3);
-				morphOpCl(proc_cueSImg, 3, 3);
+				morphOpCl(proc_cuePImg, 5, 5);
+				morphOpCl(proc_cueSImg, 5, 5);
 				
 				GaussianBlur(thdImg, thdImg, Size(3, 3), 2, 2);
 
@@ -374,68 +374,77 @@ int main()
 				vector<Vec3f> circlesWhite;
 				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
 				
+				#pragma region 큐대 중심점 검출(라벨링)
+				int numOfLables, max, idx;
+				Point pPoint, pStick;
+
+				numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids, 8, CV_32S);
+				max = -1; idx = 0;
+				for (int i = 1; i < numOfLables; i++)
+				{
+					int area = stats.at<int>(i, CC_STAT_AREA);
+					if (max < area)
+					{
+						max = area;
+						idx = i;
+					}
+				}
+				pPoint = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
+				circle(srcImg, Point(pPoint.x + poolPosROI[0].x, pPoint.y + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
+
+				numOfLables = connectedComponentsWithStats(proc_cueSImg, img_lbl, stats, centroids, 8, CV_32S);
+				max = -1; idx = 0;
+				for (int i = 1; i < numOfLables; i++)
+				{
+					int area = stats.at<int>(i, CC_STAT_AREA);
+					if (max < area)
+					{
+						max = area;
+						idx = i;
+					}
+				}
+				pStick = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
+				circle(srcImg, Point(pStick.x + poolPosROI[0].x, pStick.y + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
+				#pragma endregion
+				proc_cueSImg.copyTo(proc_cuePImg, proc_cueSImg);
+				imshow("Cue", proc_cuePImg);
+
+				//선 그리기
 				if (drawLine) {
-					#pragma region 큐대 중심점 검출(라벨링)
-					int numOfLables, max, idx;
-					Point pPoint, pStick;
-
-					numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids, 8, CV_32S);
-					max = -1; idx = 0;
-					for (int i = 1; i < numOfLables; i++)
-					{
-						int area = stats.at<int>(i, CC_STAT_AREA);
-						if (max < area)
-						{
-							max = area;
-							idx = i;
-						}
-					}
-					pPoint = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
-					circle(srcImg, Point(pPoint.x + poolPosROI[0].x, pPoint.y + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
-
-					numOfLables = connectedComponentsWithStats(proc_cueSImg, img_lbl, stats, centroids, 8, CV_32S);
-					max = -1; idx = 0;
-					for (int i = 1; i < numOfLables; i++)
-					{
-						int area = stats.at<int>(i, CC_STAT_AREA);
-						if (max < area)
-						{
-							max = area;
-							idx = i;
-						}
-					}
-					pStick = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
-					circle(srcImg, Point(pStick.x + poolPosROI[0].x, pStick.y + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
-					#pragma endregion
-					proc_cueSImg.copyTo(proc_cuePImg, proc_cueSImg);
-					imshow("Cue", proc_cuePImg);
-					
+	
 					float ang = calcAngleFromPoints(pPoint, pStick, true);
-					int countOfLine = 1;
+					int countOfLine = 10;	//number of printed line.
 
-					Point pStart = pPoint, *pEnd;
-					if (pPoint.x > pStick.x && pPoint.y > pStick.y) {	//to Right-Top
-						pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[1].x, poolPos[0].y));	//Top
-						if(!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);	//Right
-					}
-					else if (pPoint.x > pStick.x && pPoint.y < pStick.y) {	//to Right-Bottom
-						pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);	//Bottom
-						if (!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);	//Right
-					}
-					else if (pPoint.x > pStick.x && pPoint.y < pStick.y) {	//to Left-Top
-						pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[1].x, poolPos[0].y));	//Top
-						if (!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[0].x, poolPos[1].y));	//Left
-					}
-					else if (pPoint.x > pStick.x && pPoint.y < pStick.y) {	//to Left-Bottom
-						pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);	//Bottom
-						if (!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[0].x, poolPos[1].y));	//Left
-					}
-
+					Point pStart = pPoint, *pEnd = NULL;
+					
 					for (int i = 0; i < countOfLine; i++)
 					{
-						if (!pEnd) break;
-						arrowedLine(srcImg, pStart, *pEnd, Scalar(0, 0, 255));
+						//get end point of current line
+						if (!pEnd && pStart.y != roiRange)
+							pEnd = calcEndOfLinePoint(pStart, ang, Point(roiRange, roiRange), Point(poolWidth + roiRange, roiRange));	//Top
+						if (!pEnd && pStart.x != poolWidth + roiRange)
+							pEnd = calcEndOfLinePoint(pStart, ang, Point(poolWidth + roiRange, roiRange), Point(poolWidth + roiRange, poolHeight + roiRange));	//Right
+						if (!pEnd && pStart.y != poolHeight + roiRange)
+							pEnd = calcEndOfLinePoint(pStart, ang, Point(roiRange, poolHeight + roiRange), Point(poolWidth + roiRange, poolHeight + roiRange));	//Bottom
+						if (!pEnd && pStart.x != roiRange)
+							pEnd = calcEndOfLinePoint(pStart, ang, Point(roiRange, roiRange), Point(roiRange, poolHeight + roiRange));	//Left
 
+						if (!pEnd)
+							break;
+						arrowedLine(srcImg, poolPosROI[0] + pStart, poolPosROI[0] + *pEnd, Scalar(0, 0, 255));
+
+						//assign end point to start point for calculate expected next line
+						pStart = *pEnd;
+
+						//revert angle
+						if(pStart.x == roiRange || pStart.x == roiRange + poolWidth)
+							ang = 3.14159262 - ang;	//if startpoint is in left or right edge
+						else if(pStart.y == roiRange || pStart.y == roiRange + poolHeight)
+							ang = ang * -1;			//if startoint is in top or bottom edge
+
+						//rest end point
+						pEnd = NULL;
+						
 					}
 
 				}
