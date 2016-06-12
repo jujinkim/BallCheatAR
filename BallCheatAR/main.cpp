@@ -244,7 +244,7 @@ int main()
 
 	resizeWindow("Main", IMG_W, IMG_H + PANEL_H);
 	resizeWindow("Setting", 400, 170);
-	resizeWindow("Setting", 500, 500);
+	resizeWindow("Setting HSV Range", 500, 500);
 	#pragma endregion
 
 	#pragma region  Generate Trackbars
@@ -375,8 +375,9 @@ int main()
 				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
 				
 				if (drawLine) {
-					//큐대 중심점 검출(라벨링)
-					int numOfLables, max, idx, cx, cy;
+					#pragma region 큐대 중심점 검출(라벨링)
+					int numOfLables, max, idx;
+					Point pPoint, pStick;
 
 					numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids, 8, CV_32S);
 					max = -1; idx = 0;
@@ -389,9 +390,8 @@ int main()
 							idx = i;
 						}
 					}
-					cx = centroids.at<double>(idx, 0);
-					cy = centroids.at<double>(idx, 1);
-					circle(srcImg, Point(cx + poolPosROI[0].x, cy + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
+					pPoint = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
+					circle(srcImg, Point(pPoint.x + poolPosROI[0].x, pPoint.y + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
 
 					numOfLables = connectedComponentsWithStats(proc_cueSImg, img_lbl, stats, centroids, 8, CV_32S);
 					max = -1; idx = 0;
@@ -404,15 +404,40 @@ int main()
 							idx = i;
 						}
 					}
-					cx = centroids.at<double>(idx, 0);
-					cy = centroids.at<double>(idx, 1);
-					circle(srcImg, Point(cx + poolPosROI[0].x, cy + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
-
+					pStick = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
+					circle(srcImg, Point(pStick.x + poolPosROI[0].x, pStick.y + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
+					#pragma endregion
+					proc_cueSImg.copyTo(proc_cuePImg, proc_cueSImg);
 					imshow("Cue", proc_cuePImg);
-					//double *centroid = centroids.at<double*>(idx, 0); //중심좌표
-					//int x = centroid[0];
-					//int y = centroid[1];
-					//circle(srcImg, Point(x, y), 3, Scalar(255, 255, 0), 2);
+					
+					float ang = calcAngleFromPoints(pPoint, pStick, true);
+					int countOfLine = 1;
+
+					Point pStart = pPoint, *pEnd;
+					if (pPoint.x > pStick.x && pPoint.y > pStick.y) {	//to Right-Top
+						pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[1].x, poolPos[0].y));	//Top
+						if(!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);	//Right
+					}
+					else if (pPoint.x > pStick.x && pPoint.y < pStick.y) {	//to Right-Bottom
+						pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);	//Bottom
+						if (!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[1].x, poolPos[0].y), poolPos[1]);	//Right
+					}
+					else if (pPoint.x > pStick.x && pPoint.y < pStick.y) {	//to Left-Top
+						pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[1].x, poolPos[0].y));	//Top
+						if (!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[0].x, poolPos[1].y));	//Left
+					}
+					else if (pPoint.x > pStick.x && pPoint.y < pStick.y) {	//to Left-Bottom
+						pEnd = calcEndOfLinePoint(pStart, ang, Point(poolPos[0].x, poolPos[1].y), poolPos[1]);	//Bottom
+						if (!pEnd) pEnd = calcEndOfLinePoint(pStart, ang, poolPos[0], Point(poolPos[0].x, poolPos[1].y));	//Left
+					}
+
+					for (int i = 0; i < countOfLine; i++)
+					{
+						if (!pEnd) break;
+						arrowedLine(srcImg, pStart, *pEnd, Scalar(0, 0, 255));
+
+					}
+
 				}
 
 				//검출된 원 중 가장자리에 붙어있거나 가장자리 넘어간 원들을 다 지운다

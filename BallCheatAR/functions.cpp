@@ -60,3 +60,22 @@ void morphOpCl(Mat &thresh, int w, int h)
 	morphClose(thresh, w, h);
 }
 
+//get Angle with two points.
+double calcAngleFromPoints(Point2f p1, Point2f p2, bool radian = true)
+{
+	float angle;
+	float dX = p1.x - p2.x;
+	float dY = p1.y - p2.y;
+	float rad = atan2(dY, dX);
+	return radian ? rad : (rad * 180) / 3.14159262;
+}
+
+//get end point of line with "start point & radian" + "two point of another line"
+Point* calcEndOfLinePoint(Point startP, float radian, Point barPoint1, Point barPoint2)
+{
+	Point pE;
+	pE.x = (int(round(startP.x + 1000 * cos(radian))));
+	pE.x = (int(round(startP.y + 1000 * sin(radian))));
+
+	return isIntersection(startP, pE, barPoint1, barPoint2);
+}
