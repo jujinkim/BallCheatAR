@@ -56,6 +56,10 @@ bool drawLine = false;
 int cParam1 = 80, cParam2 = 9, cParam2W = 15;
 int cTh1 = 80, cTh2 = 20;
 
+//Camera parameter
+int camSaturation = DEFAULT_SATURATION;
+
+
 //반지름
 double radiusMultiply = 2;
 
@@ -241,6 +245,8 @@ int main()
 
 	//카메라 열기
 	VideoCapture capture(0);
+	capture.set(CAP_PROP_FRAME_WIDTH, 1920);
+	capture.set(CAP_PROP_FRAME_HEIGHT, 1080);
 
 	//Generate Windows
 	#pragma region Generate Windows
@@ -264,8 +270,9 @@ int main()
 	createTrackbar("cParam1", "Setting", &cParam1, 255);
 	createTrackbar("cParam2", "Setting", &cParam2, 255);
 	createTrackbar("cParam2W", "Setting", &cParam2W, 255);
-	createTrackbar("output Perspective Top", "Setting", &perspectiveParameterTop, 50);
-	createTrackbar("output Perspective Bottom", "Setting", &perspectiveParameterBottom, 50);
+	createTrackbar("Top Perspective", "Setting", &perspectiveParameterTop, 50);
+	createTrackbar("Bottom Perspective", "Setting", &perspectiveParameterBottom, 50);
+	createTrackbar("Saturation", "Setting", &camSaturation, 255);
 
 	createTrackbar("pool_range_H", "Setting HSV Range", &poolRangeH, 100);
 	createTrackbar("pool_range_S", "Setting HSV Range", &poolRangeS, 100);
@@ -286,7 +293,7 @@ int main()
 	//Assign Objects.
 	try
 	{
-		canvas = Mat3b(IMG_H+PANEL_H, IMG_W, Vec3b(0, 0, 0));
+		canvas = Mat3b(IMG_H+PANEL_H + 100, IMG_W + 100, Vec3b(0, 0, 0));
 
 		//버튼
 		btnResetPoolPos = Button(canvas, 0, IMG_H, 260, PANEL_H, "Pool Position Resetting(LT)", Scalar(200, 200, 200));
@@ -309,6 +316,9 @@ int main()
 	{
 		try
 		{
+			capture.set(CAP_PROP_SATURATION, camSaturation);
+			/*srcImg.convertTo(srcImg, -1, 0.7, 0);
+			srcImg = srcImg - Scalar(50, 50, 50);*/
 			resize(srcImg, srcImg, Size(IMG_W, IMG_H));
 			cvtColor(srcImg, hsvImg, COLOR_BGR2HSV);
 
@@ -366,7 +376,7 @@ int main()
 				//morph -> 빈공간 없애고 작은점 없애고
 				morphOpCl(thdImg, 5, 5);
 				//erode(thdImg, thdImg, getStructuringElement(MORPH_ELLIPSE, Size(20, 20))); <- 침식연산을 고려해봐도 좋을거같다.
-				morphOpCl(thdWhiteImg, 3, 3);
+				morphOpCl(thdWhiteImg, 5, 5);
 				morphOpCl(proc_cuePImg, 5, 5);
 				morphOpCl(proc_cueSImg, 5, 5);
 				
@@ -385,45 +395,45 @@ int main()
 				vector<Vec3f> circlesWhite;
 				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
 				
-				//get position and direction of cue shaft (use labelling)
-				#pragma region 큐대 중심점 검출(라벨링)
-				int numOfLables, max, idx;
-				Point pPoint, pStick;
-
-				numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids, 8, CV_32S);
-				max = -1; idx = 0;
-				for (int i = 1; i < numOfLables; i++)
-				{
-					int area = stats.at<int>(i, CC_STAT_AREA);
-					if (max < area)
-					{
-						max = area;
-						idx = i;
-					}
-				}
-				pPoint = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
-				circle(srcImg, Point(pPoint.x + poolPosROI[0].x, pPoint.y + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
-
-				numOfLables = connectedComponentsWithStats(proc_cueSImg, img_lbl, stats, centroids, 8, CV_32S);
-				max = -1; idx = 0;
-				for (int i = 1; i < numOfLables; i++)
-				{
-					int area = stats.at<int>(i, CC_STAT_AREA);
-					if (max < area)
-					{
-						max = area;
-						idx = i;
-					}
-				}
-				pStick = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
-				circle(srcImg, Point(pStick.x + poolPosROI[0].x, pStick.y + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
-				#pragma endregion
-				proc_cueSImg.copyTo(proc_cuePImg, proc_cueSImg);
-				imshow("Cue", proc_cuePImg);
+				
 
 				//선 그리기
 				if (drawLine) {
-	
+					//get position and direction of cue shaft (use labelling)
+#pragma region 큐대 중심점 검출(라벨링)
+					int numOfLables, max, idx;
+					Point pPoint, pStick;
+
+					numOfLables = connectedComponentsWithStats(proc_cuePImg, img_lbl, stats, centroids, 8, CV_32S);
+					max = -1; idx = 0;
+					for (int i = 1; i < numOfLables; i++)
+					{
+						int area = stats.at<int>(i, CC_STAT_AREA);
+						if (max < area)
+						{
+							max = area;
+							idx = i;
+						}
+					}
+					pPoint = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
+					circle(srcImg, Point(pPoint.x + poolPosROI[0].x, pPoint.y + poolPosROI[0].y), 3, Scalar(255, 0, 255), 3);
+
+					numOfLables = connectedComponentsWithStats(proc_cueSImg, img_lbl, stats, centroids, 8, CV_32S);
+					max = -1; idx = 0;
+					for (int i = 1; i < numOfLables; i++)
+					{
+						int area = stats.at<int>(i, CC_STAT_AREA);
+						if (max < area)
+						{
+							max = area;
+							idx = i;
+						}
+					}
+					pStick = Point(centroids.at<double>(idx, 0), centroids.at<double>(idx, 1));
+					circle(srcImg, Point(pStick.x + poolPosROI[0].x, pStick.y + poolPosROI[0].y), 3, Scalar(255, 255, 0), 3);
+#pragma endregion
+					proc_cueSImg.copyTo(proc_cuePImg, proc_cueSImg);
+					imshow("Cue", proc_cuePImg);
 					float ang = calcAngleFromPoints(pPoint, pStick, true);
 
 					Point pStart = pPoint, *pEnd = NULL;

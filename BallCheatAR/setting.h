@@ -9,7 +9,7 @@ Jujin Kim, Jaehyun Sim, Yeongjin Lee.
 #pragma once
 
 #define STRBUFFER 64
-#define IMG_W 640
+#define IMG_W 853
 #define IMG_H 480
 #define PANEL_H 30
 
@@ -25,5 +25,7 @@ Jujin Kim, Jaehyun Sim, Yeongjin Lee.
 #define DIST_BALL (MIN_BALL_SIZE+MAX_BALL_SIZE)
 
 #define NUMBER_OF_LINE 3
+
+#define DEFAULT_SATURATION 255
 
 #define WHITE_BALL_TRACK_LIMIT 5
