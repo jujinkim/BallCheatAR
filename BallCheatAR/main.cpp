@@ -49,14 +49,15 @@ int cTh1 = 80, cTh2 = 20;
 //반지름
 double radiusMultiply = 2;
 
-//Perspective Transform Parameter (50 -> middle, 0~100)
-int perspectiveParameter = 50;
+//Perspective Transform Parameter
+int perspectiveParameterTop = 0;
+int perspectiveParameterBottom = 0;
 
 //White ball position
 Point WhiteBallPos;
 int whiteBallLostCount = 0;
-//int whiteBallROIRange = 150;	//흰 공을 중심으로 ROI를 하나 더 만든다. 이것은 흰 공 주변의 '큐대'를 탐지하는 용도이다.
 
+//Variables of pool position
 #pragma region 당구대 위치 설정용
 bool poolSet = false;	//당구대 위치 수동세팅 완료됐는지
 int poolSetNumber = 0;	//0이면 찍을 점이 두 점, 1이면 한 점 남음. 2이면 설정 완료
@@ -67,7 +68,7 @@ Point poolPosROI[2];	//당구대 위치에서 조금(roiRange) 확대한거. ROI가 된다.
 float poolROIWidth = 0, poolROIHeight = 0;	//ROI 가로/세로
 #pragma endregion
 
-
+//Color of pool&cue shaft
 #pragma region 당구대/큐대 색상
 //당구대 색상
 Scalar poolColor = Scalar(255, 255, 255);
@@ -83,8 +84,7 @@ int cueStkCRangeH = CUE_H_INIT, cueStkCRangeS = CUE_S_INIT, cueStkCRangeV = CUE_
 bool cueStkSet = true;
 #pragma endregion
 
-
-//화면에 마우스 조작을 했을 경우
+//Mouse callback function
 void callBackFunc(int event, int x, int y, int flags, void* userdata)
 {
 	mX = x;
@@ -167,7 +167,6 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 		}
 	}
 
-
 	//큐 포인트색상 설정시작버튼
 	if (btnCuePointColor.isInPos(x, y))
 	{
@@ -233,6 +232,7 @@ int main()
 	//카메라 열기
 	VideoCapture capture(0);
 
+	//Generate Windows
 	#pragma region Generate Windows
 	namedWindow("Main");
 	namedWindow("Cue");
@@ -243,20 +243,19 @@ int main()
 	namedWindow("Display", CV_WINDOW_FREERATIO);
 
 	resizeWindow("Main", IMG_W, IMG_H + PANEL_H);
-	resizeWindow("Setting", 400, 170);
+	resizeWindow("Setting", 400, 300);
 	resizeWindow("Setting HSV Range", 500, 500);
 	#pragma endregion
 
+	//Generate Trackbars
 	#pragma region  Generate Trackbars
 	createTrackbar("RoI Range", "Setting", &roiRange, 50);
-	//createTrackbar("WhiteBall RoIRange", "Setting", &whiteBallROIRange, 150);
 
 	createTrackbar("cParam1", "Setting", &cParam1, 255);
 	createTrackbar("cParam2", "Setting", &cParam2, 255);
 	createTrackbar("cParam2W", "Setting", &cParam2W, 255);
-	/*createTrackbar("cCanny1", "Setting", &cTh1, 255);
-	createTrackbar("cCanny2", "Setting", &cTh2, 255);*/
-	createTrackbar("output Perspective", "Setting", &perspectiveParameter, 100);
+	createTrackbar("output Perspective Top", "Setting", &perspectiveParameterTop, 50);
+	createTrackbar("output Perspective Bottom", "Setting", &perspectiveParameterBottom, 50);
 
 	createTrackbar("pool_range_H", "Setting HSV Range", &poolRangeH, 100);
 	createTrackbar("pool_range_S", "Setting HSV Range", &poolRangeS, 100);
@@ -291,7 +290,7 @@ int main()
 	//FPS표시 문자열 초기화
 	char strBuf[STRBUFFER] = { 0, };
 
-	//캡쳐 루프(프레임 가져와서 srcImg에 담는다)
+	//Capture loop (to srcImg)
 	while (capture.read(srcImg))
 	{
 		try
@@ -299,12 +298,10 @@ int main()
 			resize(srcImg, srcImg, Size(IMG_W, IMG_H));
 			cvtColor(srcImg, hsvImg, COLOR_BGR2HSV);
 
-			//결과만 그릴 이미지
-			//outImg = Mat(Size(srcImg.cols, srcImg.rows), srcImg.type(), Scalar(0, 0, 0));
-
 			//당구대 위치와 색깔이 설정 된 상태이면
 			if (poolSet && poolColorSet && cuePntSet && cueStkSet)
 			{
+				//Region of Interest setting
 				#pragma region RoI 설정
 				if (poolPos[0].x - roiRange < 0) roiRange = poolPos[0].x;
 				if (poolPos[0].y - roiRange < 0) roiRange = poolPos[0].y;
@@ -374,6 +371,7 @@ int main()
 				vector<Vec3f> circlesWhite;
 				HoughCircles(thdWhiteImg, circlesWhite, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2W , MAX_BALL_SIZE, 1);
 				
+				//get position and direction of cue shaft (use labelling)
 				#pragma region 큐대 중심점 검출(라벨링)
 				int numOfLables, max, idx;
 				Point pPoint, pStick;
@@ -533,19 +531,20 @@ int main()
 				rectangle(srcImg, Rect(pntGuideline1 + poolPosROI[0], pntGuideline2 + poolPosROI[0]), Scalar(0, 255, 255), 1);
 				rectangle(outImg, Rect(roiRange,roiRange, poolWidth, poolHeight), Scalar(255, 255, 255), 2);
 
+				//Output perspective transform (warp image)
 				#pragma region perspectiveTransform 변환
-				/*Point2f p1[4], p2[4];
+				Point2f p1[4], p2[4];
 				p1[0] = Point2f(0, 0);
 				p1[1] = Point2f(outImg.cols, 0);
-				p1[2] = Point2f(outImg.cols, outImg.rows);
-				p1[3] = Point2f(0, outImg.rows);
+				p1[2] = Point2f(outImg.cols, outImg.rows-1);
+				p1[3] = Point2f(0, outImg.rows-1);
 
-				p2[0] = Point2f(perspectiveParameter>50 ? perspectiveParameter - 50 : 0, 0);
-				p2[1] = Point2f(outImg.cols - (perspectiveParameter>50 ? perspectiveParameter - 50 : 0), 0);
-				p2[2] = Point2f(outImg.cols - perspectiveParameter<50 ? 50 - perspectiveParameter : 0, outImg.rows);
-				p2[3] = Point2f(perspectiveParameter<50 ? 50 - perspectiveParameter : 0, outImg.rows);
+				p2[0] = Point2f(perspectiveParameterTop, 0);
+				p2[1] = Point2f(outImg.cols-1 - perspectiveParameterTop, 0);
+				p2[2] = Point2f(outImg.cols-1 - perspectiveParameterBottom, outImg.rows-1);
+				p2[3] = Point2f(perspectiveParameterBottom, outImg.rows-1);
 				Mat m = getPerspectiveTransform(p1, p2);
-				warpPerspective(outImg, outImg, m, Size(outImg.cols, outImg.rows));*/
+				warpPerspective(outImg, outImg, m, Size(outImg.cols, outImg.rows));
 				#pragma endregion
 			}
 			//현재 당구대 위치 설정중이면
