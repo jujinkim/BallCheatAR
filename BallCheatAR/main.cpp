@@ -1,3 +1,11 @@
+/*
+BallCheatAR
+Projection mapping project.
+Detect balls and cue shaft, draw some effects and expected path using OpenCV
+jk012345@gmail.com
+Jujin Kim, Jaehyun Sim, Yeongjin Lee.
+*/
+
 #include <Windows.h>
 #include <iostream>
 #include <opencv2\imgproc.hpp>
@@ -365,7 +373,7 @@ int main()
 				
 				imshow("Threshold_W", thdWhiteImg);
 
-				//원(당구공) 검출 (circles에 담는다)
+				//Hough Circles 원(당구공) 검출 (circles에 담는다)
 				vector<Vec3f> circles;				
 				HoughCircles(thdImg, circles, CV_HOUGH_GRADIENT, 1, DIST_BALL, cParam1, cParam2, MAX_BALL_SIZE, 1);
 				vector<Vec3f> circlesWhite;
@@ -447,8 +455,8 @@ int main()
 
 				}
 
-				//검출된 원 중 가장자리에 붙어있거나 가장자리 넘어간 원들을 다 지운다
-				////////////////////원 그리기///////////////////////
+				//원 그리기
+				#pragma region Draw Circles (all balls)
 				Point pntGuideline1(roiRange + DIST_BALL / 2.3, roiRange + DIST_BALL / 2.3);
 				Point pntGuideline2(roiRange + poolWidth - DIST_BALL / 2.3, roiRange + poolHeight - DIST_BALL / 2.3);
 				vector<Vec3f>::const_iterator itc = circles.begin();
@@ -479,7 +487,9 @@ int main()
 
 					++itc;
 				}
+				#pragma endregion
 
+				#pragma region Draw White Circle
 				//흰공
 				vector<Vec3f>::const_iterator itcW = circlesWhite.begin();
 				float maxRadius = 0;
@@ -524,8 +534,9 @@ int main()
 					circle(srcImg, Point(WhiteBallPos.x + poolPosROI[0].x, WhiteBallPos.y + poolPosROI[0].y), MAX_BALL_SIZE + 5, Scalar(0, 255, 0), 2);
 				}
 				else cout << "White Ball Lost" << endl;
+				#pragma endregion
 
-				//당구대 가장자리 선을 그린다
+				//Draw edge of pool (refer to poolPos and poolPosROI)
 				rectangle(srcImg, Rect(poolPosROI[0], poolPosROI[1]), Scalar(0, 0, 255), 1);
 				rectangle(srcImg, Rect(poolPos[0], poolPos[1]), Scalar(255, 255, 255), 2);
 				rectangle(srcImg, Rect(pntGuideline1 + poolPosROI[0], pntGuideline2 + poolPosROI[0]), Scalar(0, 255, 255), 1);
@@ -566,7 +577,6 @@ int main()
 			srcImg.copyTo(canvas(Rect(0, 0, srcImg.cols, srcImg.rows)));
 
 			//출력
-
 			imshow("Main", canvas);
 			imshow("Display", outImg);
 		}
@@ -575,7 +585,7 @@ int main()
 			cout << "에러 : " << e.msg << endl;
 		}
 
-		//ESC to escape program
+		//press any key to escape program
 		if (cvWaitKey(33) >= 27) break;
 	}
 	srcImg.release();

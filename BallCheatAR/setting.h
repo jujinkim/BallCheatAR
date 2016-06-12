@@ -1,3 +1,11 @@
+/*
+BallCheatAR
+Projection mapping project.
+Detect balls and cue shaft, draw some effects and expected path using OpenCV
+jk012345@gmail.com
+Jujin Kim, Jaehyun Sim, Yeongjin Lee.
+*/
+
 #pragma once
 
 #define STRBUFFER 64
