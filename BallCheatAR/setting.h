@@ -24,4 +24,6 @@ Jujin Kim, Jaehyun Sim, Yeongjin Lee.
 #define MAX_BALL_SIZE 15
 #define DIST_BALL (MIN_BALL_SIZE+MAX_BALL_SIZE)
 
+#define NUMBER_OF_LINE 3
+
 #define WHITE_BALL_TRACK_LIMIT 5

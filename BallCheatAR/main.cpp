@@ -15,7 +15,7 @@ Jujin Kim, Jaehyun Sim, Yeongjin Lee.
 #include "setting.h"
 #include "button.h"
 #include "functions.h"
-
+//#include "main.h"
 
 using namespace cv; 
 using namespace std;
@@ -42,6 +42,8 @@ Mat proc_cuePImg;	//큐대-포인트쪽
 Mat proc_cueSImg;	//큐대-막대쪽
 Mat outImg;	//빔프로젝터 출력 이미지
 Mat img_lbl, stats, centroids;
+
+Mat logoImg;	//로고
 #pragma endregion
 
 //화면 위 마우스 위치
@@ -298,6 +300,10 @@ int main()
 	//FPS표시 문자열 초기화
 	char strBuf[STRBUFFER] = { 0, };
 
+	//get logo img
+	logoImg = imread("ballcheatLogo.png", IMREAD_UNCHANGED);
+	resize(logoImg, logoImg, Size(300, 300));
+
 	//Capture loop (to srcImg)
 	while (capture.read(srcImg))
 	{
@@ -419,11 +425,10 @@ int main()
 				if (drawLine) {
 	
 					float ang = calcAngleFromPoints(pPoint, pStick, true);
-					int countOfLine = 10;	//number of printed line.
 
 					Point pStart = pPoint, *pEnd = NULL;
 					
-					for (int i = 0; i < countOfLine; i++)
+					for (int i = 0; i < NUMBER_OF_LINE; i++)
 					{
 						//get end point of current line
 						if (!pEnd && pStart.y != roiRange)
@@ -438,6 +443,7 @@ int main()
 						if (!pEnd)
 							break;
 						arrowedLine(srcImg, poolPosROI[0] + pStart, poolPosROI[0] + *pEnd, Scalar(0, 0, 255));
+						line(outImg, pStart, *pEnd, Scalar(255, 255, 255));
 
 						//assign end point to start point for calculate expected next line
 						pStart = *pEnd;
@@ -564,6 +570,33 @@ int main()
 				//십자선(가이드라인)을 그린다.
 				line(srcImg, Point(0, mY), Point(IMG_W, mY), Scalar(100, 100, 100));
 				line(srcImg, Point(mX, 0), Point(mX, IMG_H), Scalar(100, 100, 100));
+
+				//로고를 출력이미지에 그린다.
+				#pragma region Logo Output
+				outImg = Mat(Size(srcImg.cols, srcImg.rows), CV_32S , Scalar(0, 0, 0));
+				//outImg = Mat(srcImg.rows, srcImg.cols, CV_32S);
+				//cvtColor(outImg, outImg, CV_BGR2BGRA);
+				Mat logoRoi = outImg(Rect(outImg.cols / 2 - logoImg.cols / 2, outImg.rows / 2 - logoImg.rows / 2, logoImg.cols, logoImg.rows));
+				int nr = logoImg.rows, nc = logoImg.cols;
+
+				for (int i = 0; i < nr; i++)
+				{
+					Vec4b *logoData = logoImg.ptr<Vec4b>(i);
+					Vec4b *roiData = logoRoi.ptr<Vec4b>(i);
+
+					for (int j = 0; j < nc; j++)
+					{
+						if (logoData[j][3] > 0) {
+							double bgAlpha = (255 - logoData[j][3]) / 255.0;
+							double fgAlpha = (logoData[j][3]) / 255.0;
+
+							roiData[j][0] = roiData[j][0] * bgAlpha + logoData[j][0] * fgAlpha;
+							roiData[j][1] = roiData[j][1] * bgAlpha + logoData[j][1] * fgAlpha;
+							roiData[j][2] = roiData[j][2] * bgAlpha + logoData[j][2] * fgAlpha;
+						}
+					}
+				}
+				#pragma endregion
 			}
 
 			//당구대 꼭지점을 그린다. 값이 비어있으면 안그린다.
@@ -593,6 +626,7 @@ int main()
 	gryImg.release();
 	procImg.release();
 	thdImg.release();
+	logoImg.release();
 	thdWhiteImg.release();
 	capture.release();
 	cvDestroyAllWindows();
